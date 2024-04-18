@@ -1,5 +1,5 @@
 <script lang="ts">
-	import RiveCanvas from '@rive-app/canvas-advanced';
+	import RiveCanvas, { type StateMachineInstance } from '@rive-app/canvas-advanced';
 	import { onMount } from 'svelte';
 	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
 	import type { Character } from './types';
@@ -19,6 +19,7 @@
 		machine: null,
 		inputs: {},
 		inputNames: ['attack', 'hit', 'walking', 'up', 'down', 'left', 'right'],
+		mainWrapper: null,
 		direction: {
 			up: false,
 			down: false,
@@ -35,8 +36,6 @@
 		minY: 0
 	};
 
-	const slimeInputNames = ['hit'];
-	const slimeMovementSpeed = 40;
 	const slimeHitbox = {
 		width: 80,
 		height: 80
@@ -46,14 +45,18 @@
 	for (let i = 0; i < initialSlimeCount; i++) {
 		enemies.push({
 			health: 1,
-			speed: slimeMovementSpeed,
-			hitbox: slimeHitbox,
+			speed: 40,
+			hitbox: {
+				width: 80,
+				height: 80
+			},
 			x: 500,
 			y: 100,
 			artboard: null,
 			machine: null,
 			inputs: {},
-			inputNames: ['hit']
+			inputNames: ['hit'],
+			mainWrapper: null
 		});
 	}
 
@@ -65,9 +68,6 @@
 		left: false,
 		right: false
 	};
-	let heroInputs: any = {};
-	let slimeInputs: any = {};
-	let slimePosition = { x: 500, y: 100 };
 
 	function getMovement(elapsedTimeMs: number) {
 		// Check if moving diagonally
@@ -112,8 +112,8 @@
 	}
 
 	function checkEnemyCollision() {
-		const slimeX = slimePosition.x;
-		const slimeY = slimePosition.y;
+		const slimeX = enemies[0].x;
+		const slimeY = enemies[0].y;
 
 		if (
 			hero.x < slimeX + slimeHitbox.width &&
@@ -159,10 +159,22 @@
 			slimeArtboard.stateMachineByName('State Machine 1'),
 			slimeArtboard
 		);
-		slimeInputNames.forEach((triggerName) => {
-			slimeInputs[triggerName] = getInputByName(slimeMachine, triggerName);
+		enemies.forEach((enemy) => {
+			enemy.artboard = file.artboardByName('Slime');
+			enemy.mainWrapper = enemy.artboard.node('main wrapper');
+			enemy.mainWrapper.scaleX = artboardScale;
+			enemy.mainWrapper.scaleY = artboardScale;
+			enemy.machine = new rive.StateMachineInstance(
+				enemy.artboard.stateMachineByName('State Machine 1'),
+				enemy.artboard
+			);
+			enemy.inputNames.forEach((triggerName) => {
+				enemy.inputs[triggerName] = getInputByName(
+					enemy.machine as StateMachineInstance,
+					triggerName
+				);
+			});
 		});
-
 		function renderLoop(time: number) {
 			if (!lastTime) {
 				lastTime = time;
@@ -176,7 +188,7 @@
 			//draw enemies
 			slimeArtboard.advance(elapsedTimeSec);
 			slimeMachine.advance(elapsedTimeSec);
-			slimeMainWrapper.x = slimePosition.x;
+			slimeMainWrapper.x = enemies[0].x;
 			slimeArtboard.draw(renderer);
 
 			//draw hero

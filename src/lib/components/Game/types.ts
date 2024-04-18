@@ -10,6 +10,7 @@ export interface Character {
 	machine: StateMachineInstance | null;
 	inputs: { [key: string]: any };
 	inputNames: string[];
+	mainWrapper: any;
 	direction?: {
 		up: false;
 		down: false;
