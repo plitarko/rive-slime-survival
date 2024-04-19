@@ -1,11 +1,23 @@
 <script lang="ts">
 	import RiveCanvas, { type StateMachineInstance } from '@rive-app/canvas-advanced';
-	import { onMount } from 'svelte';
 	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
+	import { onMount } from 'svelte';
+	import GameBro from './GameBro.svelte';
 	import type { Character } from './types';
-	import { getInputByName, getCharacterRect, getSwordRect, getHeroMovement } from './functions';
+	import {
+		getInputByName,
+		getCharacterRect,
+		getSwordRect,
+		setHeroMovement,
+		checkSwordHit,
+		checkEnemyCollision,
+		setLinearMovement,
+		applyKnockback,
+		isOutOfBounds
+	} from './functions';
 
-	const enemies: Character[] = [];
+	const drawHitboxes = false;
+	let enemies: Character[] = [];
 	const hero: Character = {
 		health: 3,
 		speed: 500,
@@ -40,27 +52,22 @@
 		width: 200,
 		height: 100
 	};
-
-	const slimeHitbox = {
-		width: 100,
-		height: 100
-	};
-
 	const initialSlimeCount = 5;
+
 	for (let i = 0; i < initialSlimeCount; i++) {
 		enemies.push({
-			health: 1,
-			speed: 450,
+			health: 3,
+			speed: 100,
 			hitbox: {
 				width: 88,
 				height: 80
 			},
-			x: 500,
-			y: 100,
+			x: 1000 * Math.random(),
+			y: 1000 * Math.random(),
 			artboard: null,
 			machine: null,
 			inputs: {},
-			inputNames: ['hit'],
+			inputNames: ['attack', 'hit'],
 			mainWrapper: null,
 			movement: {
 				up: false,
@@ -76,40 +83,6 @@
 	let canvasElement: HTMLCanvasElement;
 	let isSwingingSword = false;
 	let timeSinceSwing = 0;
-
-	function checkEnemyCollision() {
-		const slimeX = enemies[0].x - enemies[0].hitbox.width / 2;
-		const slimeY = enemies[0].y - enemies[0].hitbox.height / 2;
-		const heroX = hero.x - hero.hitbox.width / 2;
-		const heroY = hero.y - hero.hitbox.height / 2;
-
-		if (
-			heroX < slimeX + enemies[0].hitbox.width &&
-			heroX + hero.hitbox.width > slimeX &&
-			heroY < slimeY + enemies[0].hitbox.height &&
-			heroY + hero.hitbox.height > slimeY
-		) {
-			return true;
-		}
-		return false;
-	}
-
-	function checkSwordHit() {
-		const heroX = hero.x - hero.hitbox.width / 2;
-		const heroY = hero.y - hero.hitbox.height / 2;
-		const swordX = heroX + swordHitbox.width;
-		const swordY = heroY + swordHitbox.height;
-		const slimeX = enemies[0].x - enemies[0].hitbox.width / 2;
-		const slimeY = enemies[0].y - enemies[0].hitbox.height / 2;
-		if (
-			swordX < slimeX + enemies[0].hitbox.width &&
-			swordX + swordHitbox.width > slimeX &&
-			swordY < slimeY + enemies[0].hitbox.height &&
-			swordY + swordHitbox.height > slimeY
-		) {
-			enemies[0].inputs.hit.fire();
-		}
-	}
 
 	async function main() {
 		const rive = await RiveCanvas({
@@ -136,15 +109,7 @@
 			hero.inputs[triggerName] = getInputByName(heroMachine, triggerName);
 		});
 
-		//setup slime
-		const slimeArtboard = file.artboardByName('Slime');
-		const slimeMainWrapper = slimeArtboard.node('main wrapper');
-		slimeMainWrapper.scaleX = artboardScale;
-		slimeMainWrapper.scaleY = artboardScale;
-		const slimeMachine = new rive.StateMachineInstance(
-			slimeArtboard.stateMachineByName('State Machine 1'),
-			slimeArtboard
-		);
+		//setup enemies
 		enemies.forEach((enemy) => {
 			enemy.artboard = file.artboardByName('Slime');
 			enemy.mainWrapper = enemy.artboard.node('main wrapper');
@@ -161,6 +126,7 @@
 				);
 			});
 		});
+
 		function gameLoop(time: number) {
 			if (!lastTime) {
 				lastTime = time;
@@ -171,14 +137,21 @@
 
 			renderer.clear();
 
+			//sort enemies
+			enemies = [...enemies.sort((a, b) => a.y - b.y)];
+
 			//draw enemies
-			slimeArtboard.advance(elapsedTimeSec);
-			slimeMachine.advance(elapsedTimeSec);
-			slimeMainWrapper.x = enemies[0].x;
-			slimeArtboard.draw(renderer);
+			enemies.forEach((enemy) => {
+				setLinearMovement(elapsedTimeSec, enemy, hero);
+				enemy?.artboard?.advance(elapsedTimeSec);
+				enemy?.machine?.advance(elapsedTimeSec);
+				enemy?.artboard?.draw(renderer);
+				enemy.mainWrapper.x = enemy.x;
+				enemy.mainWrapper.y = enemy.y;
+			});
 
 			//draw hero
-			getHeroMovement(elapsedTimeSec, hero, levelBoundaries);
+			setHeroMovement(elapsedTimeSec, hero, levelBoundaries);
 			heroArtboard.advance(elapsedTimeSec);
 			heroMachine.advance(elapsedTimeSec);
 			heroMainWrapper.x = hero.x;
@@ -187,21 +160,33 @@
 			renderer.save();
 
 			//check for collisions with enemies
-			if (checkEnemyCollision()) {
-				hero.inputs.hit.fire();
-			}
+			enemies.forEach((enemy) => {
+				if (checkEnemyCollision(hero, enemy)) {
+					hero.inputs.hit.fire();
+					enemy.inputs.attack.fire();
+
+					//knockback if not out of bounds
+					if (!isOutOfBounds(hero, levelBoundaries).x && !isOutOfBounds(hero, levelBoundaries).y) {
+						applyKnockback(hero, enemy, 100, levelBoundaries, false);
+					}
+				}
+			});
 
 			//draw hitboxes
-			//@ts-ignore
-			renderer.fillStyle = 'rgba(255, 0, 0, 0.5)';
+			if (drawHitboxes) {
+				//@ts-ignore
+				renderer.fillStyle = 'rgba(255, 0, 0, 0.5)';
 
-			const heroRect = getCharacterRect(hero);
-			//@ts-ignore
-			renderer.fillRect(heroRect.x, heroRect.y, heroRect.width, heroRect.height);
+				const heroRect = getCharacterRect(hero);
+				//@ts-ignore
+				renderer.fillRect(heroRect.x, heroRect.y, heroRect.width, heroRect.height);
 
-			const enemyRect = getCharacterRect(enemies[0]);
-			//@ts-ignore
-			renderer.fillRect(enemyRect.x, enemyRect.y, enemyRect.width, enemyRect.height);
+				enemies.forEach((enemy) => {
+					const enemyRect = getCharacterRect(enemy);
+					//@ts-ignore
+					renderer.fillRect(enemyRect.x, enemyRect.y, enemyRect.width, enemyRect.height);
+				});
+			}
 
 			//check for sword hit
 			if (isSwingingSword) {
@@ -210,12 +195,25 @@
 					isSwingingSword = false;
 					timeSinceSwing = 0;
 				}
-				checkSwordHit();
+				enemies.forEach((enemy) => {
+					if (checkSwordHit(hero, enemy, swordHitbox)) {
+						enemy.health -= 1;
+						if (enemy.health <= 0) {
+							enemies = enemies.filter((e) => e !== enemy);
+						}
+						enemy.inputs.hit.fire();
+						applyKnockback(enemy, hero, 50, levelBoundaries, false);
+					}
+				});
 
-				//draw sword hitbox
-				const swordRect = getSwordRect(hero, swordHitbox);
-				//@ts-ignore
-				renderer.fillRect(swordRect.x, swordRect.y, swordRect.width, swordRect.height);
+				if (drawHitboxes) {
+					//@ts-ignore
+					renderer.fillStyle = 'rgba(255, 0, 0, 0.5)';
+					//draw sword hitbox
+					const swordRect = getSwordRect(hero, swordHitbox);
+					//@ts-ignore
+					renderer.fillRect(swordRect.x, swordRect.y, swordRect.width, swordRect.height);
+				}
 			}
 
 			rive.requestAnimationFrame(gameLoop);
@@ -272,7 +270,12 @@
 </script>
 
 <div class="wrapper">
-	<canvas height="1000" width="1000" bind:this={canvasElement}></canvas>
+	<div class="game-window">
+		<canvas height="1000" width="1000" bind:this={canvasElement}></canvas>
+		<div class="game-bro-wrapper">
+			<GameBro />
+		</div>
+	</div>
 </div>
 
 <style>
@@ -286,13 +289,41 @@
 		width: 100vw;
 		width: 100svw;
 		background-color: #22282c;
+		background: linear-gradient(180deg, rgb(40, 46, 51) 0%, #181d20 100%);
+		@media screen and (max-width: 850px) {
+			display: block;
+			padding-left: 19.5vw;
+		}
 	}
-	canvas {
-		height: calc(min(100vh, 100vw) - 50px);
-		width: calc(min(100vw, 100vh) - 50px);
+	.game-window {
+		position: relative;
+		height: calc(min(100vh, 100vw) - 30px);
+		width: calc(min(100vw, 100vh) - 30px);
 		max-height: 500px;
 		max-width: 500px;
+		margin-top: -100px;
+
+		@media screen and (max-height: 750px) {
+			margin-top: unset;
+		}
+		@media screen and (max-width: 850px) {
+			height: calc(min(60vh, 60vw));
+			width: calc(min(60vw, 60vh));
+			margin-top: 23%;
+		}
+	}
+	canvas {
+		height: 100%;
+		width: 100%;
 		background-color: #2a3035;
-		border-radius: 16px;
+		background: linear-gradient(180deg, #1e262b 0%, rgb(39, 46, 53) 100%);
+	}
+	.game-bro-wrapper {
+		position: absolute;
+		top: -26.8%;
+		left: -81.7%;
+		height: 266%;
+		width: 266%;
+		opacity: 0.5;
 	}
 </style>

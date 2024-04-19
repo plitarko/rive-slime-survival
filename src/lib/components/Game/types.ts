@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Artboard, StateMachineInstance } from '@rive-app/canvas-advanced';
 
 export interface Character {

@@ -80,7 +80,7 @@ export function getSwordRect(
  * @param hero The character whose movement is being calculated.
  * @param levelBoundaries The boundaries of the level within which the character can move.
  */
-export function getHeroMovement(
+export function setHeroMovement(
 	elapsedTimeSec: number,
 	hero: Character,
 	levelBoundaries: { maxX: number; maxY: number; minX: number; minY: number }
@@ -116,4 +116,112 @@ export function getHeroMovement(
 	} else if (hero.movement.right) {
 		hero.x = levelBoundaries.maxX;
 	}
+}
+
+export function setLinearMovement(elapsedTimeSec: number, character: Character, target: Character) {
+	const dx = target.x - character.x;
+	const dy = target.y - character.y;
+	const angle = Math.atan2(dy, dx);
+	const speed = character.speed * elapsedTimeSec;
+
+	character.x += Math.cos(angle) * speed;
+	character.y += Math.sin(angle) * speed;
+}
+
+export function checkEnemyCollision(hero: Character, enemy: Character) {
+	const enemyRect = getCharacterRect(enemy);
+	const heroRect = getCharacterRect(hero);
+
+	if (
+		heroRect.x < enemyRect.x + enemyRect.width &&
+		heroRect.x + heroRect.width > enemyRect.x &&
+		heroRect.y < enemyRect.y + enemyRect.height &&
+		heroRect.y + heroRect.height > enemyRect.y
+	) {
+		return true;
+	}
+	return false;
+}
+
+export function checkSwordHit(
+	hero: Character,
+	enemy: Character,
+	swordHitbox: { width: number; height: number }
+) {
+	const swordRect = getSwordRect(hero, swordHitbox);
+	const enemyRect = getCharacterRect(enemy);
+
+	if (
+		swordRect.x < enemyRect.x + enemyRect.width &&
+		swordRect.x + swordRect.width > enemyRect.x &&
+		swordRect.y < enemyRect.y + enemyRect.height &&
+		swordRect.y + swordRect.height > enemyRect.y
+	) {
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Applies knockback to a character based on the position of an offender.
+ *
+ * @param victim The character receiving the knockback.
+ * @param offender The character causing the knockback.
+ * @param knockbackStrength The strength of the knockback effect.
+ */
+export function applyKnockback(
+	victim: Character,
+	offender: Character,
+	knockbackStrength: number,
+	levelBoundaries: { maxX: number; maxY: number; minX: number; minY: number },
+	canExceedBoundaries: boolean = true
+): void {
+	const victimPosition = getCharacterRect(victim);
+	const offenderPosition = getCharacterRect(offender);
+
+	const deltaX = victimPosition.x - offenderPosition.x;
+	const deltaY = victimPosition.y - offenderPosition.y;
+
+	const normalizationFactor = 100;
+	const normalizedX = deltaX / normalizationFactor;
+	const normalizedY = deltaY / normalizationFactor;
+
+	victim.x += normalizedX * knockbackStrength;
+	victim.y += normalizedY * knockbackStrength;
+
+	if (!canExceedBoundaries) {
+		keepInBounds(victim, levelBoundaries);
+	}
+}
+
+export function keepInBounds(
+	character: Character,
+	levelBoundaries: { maxX: number; maxY: number; minX: number; minY: number }
+) {
+	if (character.x >= levelBoundaries.maxX) {
+		character.x = levelBoundaries.maxX;
+	} else if (character.x <= levelBoundaries.minX) {
+		character.x = levelBoundaries.minX;
+	} else if (character.y >= levelBoundaries.maxY) {
+		character.y = levelBoundaries.maxY;
+	} else if (character.y <= levelBoundaries.minY) {
+		character.y = levelBoundaries.minY;
+	}
+}
+
+export function isOutOfBounds(
+	character: Character,
+	levelBoundaries: { maxX: number; maxY: number; minX: number; minY: number }
+) {
+	const result = { x: false, y: false };
+	if (character.x > levelBoundaries.maxX) {
+		result.x = true;
+	} else if (character.x < levelBoundaries.minX) {
+		result.x = true;
+	} else if (character.y > levelBoundaries.maxY) {
+		result.y = true;
+	} else if (character.y < levelBoundaries.minY) {
+		result.y = true;
+	}
+	return result;
 }
