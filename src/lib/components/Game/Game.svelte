@@ -3,12 +3,12 @@
 	import { onMount } from 'svelte';
 	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
 	import type { Character } from './types';
-	import { getInputByName } from './functions';
+	import { getInputByName, getCharacterRect, getSwordRect, getHeroMovement } from './functions';
 
 	const enemies: Character[] = [];
 	const hero: Character = {
 		health: 3,
-		speed: 40,
+		speed: 500,
 		hitbox: {
 			width: 100,
 			height: 100
@@ -20,12 +20,13 @@
 		inputs: {},
 		inputNames: ['attack', 'hit', 'walking', 'up', 'down', 'left', 'right'],
 		mainWrapper: null,
-		direction: {
+		movement: {
 			up: false,
 			down: false,
 			left: false,
 			right: false
-		}
+		},
+		orientation: 'down'
 	};
 
 	const artboardScale = 4; //determines how big individual artboards are drawn
@@ -35,19 +36,23 @@
 		minX: 0,
 		minY: 0
 	};
+	const swordHitbox = {
+		width: 200,
+		height: 100
+	};
 
 	const slimeHitbox = {
-		width: 80,
-		height: 80
+		width: 100,
+		height: 100
 	};
 
 	const initialSlimeCount = 5;
 	for (let i = 0; i < initialSlimeCount; i++) {
 		enemies.push({
 			health: 1,
-			speed: 40,
+			speed: 450,
 			hitbox: {
-				width: 80,
+				width: 88,
 				height: 80
 			},
 			x: 500,
@@ -56,72 +61,53 @@
 			machine: null,
 			inputs: {},
 			inputNames: ['hit'],
-			mainWrapper: null
+			mainWrapper: null,
+			movement: {
+				up: false,
+				down: false,
+				left: false,
+				right: false
+			},
+			orientation: 'down'
 		});
 	}
 
 	let lastTime: number;
 	let canvasElement: HTMLCanvasElement;
-	let heroMovement = {
-		up: false,
-		down: false,
-		left: false,
-		right: false
-	};
-
-	function getMovement(elapsedTimeMs: number) {
-		// Check if moving diagonally
-		const isDiagonal =
-			(heroMovement.up || heroMovement.down) && (heroMovement.left || heroMovement.right);
-
-		// Determine movement speed
-		const speed = isDiagonal
-			? hero.speed / Math.sqrt(2) / elapsedTimeMs
-			: hero.speed / elapsedTimeMs;
-
-		// Apply movement
-		if (heroMovement.up) {
-			if (hero.y - speed >= levelBoundaries.minY) {
-				hero.y -= speed;
-			} else {
-				hero.y = levelBoundaries.minY;
-			}
-		}
-		if (heroMovement.down) {
-			if (hero.y + speed <= levelBoundaries.maxY) {
-				hero.y += speed;
-			} else {
-				hero.y = levelBoundaries.maxY;
-			}
-		}
-		if (heroMovement.left) {
-			if (hero.x - speed >= levelBoundaries.minX) {
-				hero.x -= speed;
-			} else {
-				hero.x = levelBoundaries.minX;
-			}
-		}
-		if (heroMovement.right) {
-			if (hero.x + speed <= levelBoundaries.maxX) {
-				hero.x += speed;
-			} else {
-				hero.x = levelBoundaries.maxX;
-			}
-		}
-		checkEnemyCollision();
-	}
+	let isSwingingSword = false;
+	let timeSinceSwing = 0;
 
 	function checkEnemyCollision() {
-		const slimeX = enemies[0].x;
-		const slimeY = enemies[0].y;
+		const slimeX = enemies[0].x - enemies[0].hitbox.width / 2;
+		const slimeY = enemies[0].y - enemies[0].hitbox.height / 2;
+		const heroX = hero.x - hero.hitbox.width / 2;
+		const heroY = hero.y - hero.hitbox.height / 2;
 
 		if (
-			hero.x < slimeX + slimeHitbox.width &&
-			hero.x + hero.hitbox.width > slimeX &&
-			hero.y < slimeY + slimeHitbox.height &&
-			hero.y + hero.hitbox.height > slimeY
+			heroX < slimeX + enemies[0].hitbox.width &&
+			heroX + hero.hitbox.width > slimeX &&
+			heroY < slimeY + enemies[0].hitbox.height &&
+			heroY + hero.hitbox.height > slimeY
 		) {
-			hero.inputs.hit.fire();
+			return true;
+		}
+		return false;
+	}
+
+	function checkSwordHit() {
+		const heroX = hero.x - hero.hitbox.width / 2;
+		const heroY = hero.y - hero.hitbox.height / 2;
+		const swordX = heroX + swordHitbox.width;
+		const swordY = heroY + swordHitbox.height;
+		const slimeX = enemies[0].x - enemies[0].hitbox.width / 2;
+		const slimeY = enemies[0].y - enemies[0].hitbox.height / 2;
+		if (
+			swordX < slimeX + enemies[0].hitbox.width &&
+			swordX + swordHitbox.width > slimeX &&
+			swordY < slimeY + enemies[0].hitbox.height &&
+			swordY + swordHitbox.height > slimeY
+		) {
+			enemies[0].inputs.hit.fire();
 		}
 	}
 
@@ -175,7 +161,7 @@
 				);
 			});
 		});
-		function renderLoop(time: number) {
+		function gameLoop(time: number) {
 			if (!lastTime) {
 				lastTime = time;
 			}
@@ -192,7 +178,7 @@
 			slimeArtboard.draw(renderer);
 
 			//draw hero
-			getMovement(elapsedTimeMs);
+			getHeroMovement(elapsedTimeSec, hero, levelBoundaries);
 			heroArtboard.advance(elapsedTimeSec);
 			heroMachine.advance(elapsedTimeSec);
 			heroMainWrapper.x = hero.x;
@@ -200,46 +186,85 @@
 			heroArtboard.draw(renderer);
 			renderer.save();
 
-			rive.requestAnimationFrame(renderLoop);
+			//check for collisions with enemies
+			if (checkEnemyCollision()) {
+				hero.inputs.hit.fire();
+			}
+
+			//draw hitboxes
+			//@ts-ignore
+			renderer.fillStyle = 'rgba(255, 0, 0, 0.5)';
+
+			const heroRect = getCharacterRect(hero);
+			//@ts-ignore
+			renderer.fillRect(heroRect.x, heroRect.y, heroRect.width, heroRect.height);
+
+			const enemyRect = getCharacterRect(enemies[0]);
+			//@ts-ignore
+			renderer.fillRect(enemyRect.x, enemyRect.y, enemyRect.width, enemyRect.height);
+
+			//check for sword hit
+			if (isSwingingSword) {
+				timeSinceSwing += elapsedTimeSec;
+				if (timeSinceSwing > 0.2) {
+					isSwingingSword = false;
+					timeSinceSwing = 0;
+				}
+				checkSwordHit();
+
+				//draw sword hitbox
+				const swordRect = getSwordRect(hero, swordHitbox);
+				//@ts-ignore
+				renderer.fillRect(swordRect.x, swordRect.y, swordRect.width, swordRect.height);
+			}
+
+			rive.requestAnimationFrame(gameLoop);
 		}
-		rive.requestAnimationFrame(renderLoop);
+		rive.requestAnimationFrame(gameLoop);
 	}
 
 	onMount(() => {
 		main();
 		addEventListener('keydown', (event) => {
 			if (event.code === 'KeyW') {
-				heroMovement.up = true;
+				hero.movement.up = true;
 				hero.inputs.up.fire();
+				hero.orientation = 'up';
 				hero.inputs.walking.value = 1;
 			} else if (event.code === 'KeyS') {
-				heroMovement.down = true;
+				hero.movement.down = true;
 				hero.inputs.down.fire();
+				hero.orientation = 'down';
 				hero.inputs.walking.value = 1;
 			} else if (event.code === 'KeyA') {
-				heroMovement.left = true;
+				hero.movement.left = true;
 				hero.inputs.left.fire();
+				hero.orientation = 'left';
 				hero.inputs.walking.value = 1;
 			} else if (event.code === 'KeyD') {
-				heroMovement.right = true;
+				hero.movement.right = true;
 				hero.inputs.right.fire();
+				hero.orientation = 'right';
 				hero.inputs.walking.value = 1;
 			} else if (event.code === 'Space') {
+				if (timeSinceSwing > 0) return;
 				hero.inputs.attack.fire();
+				isSwingingSword = true;
+				timeSinceSwing = 0;
 			}
 		});
 
 		addEventListener('keyup', (event) => {
 			if (event.code === 'KeyW') {
-				heroMovement.up = false;
+				hero.movement.up = false;
 			} else if (event.code === 'KeyS') {
-				heroMovement.down = false;
+				hero.movement.down = false;
 			} else if (event.code === 'KeyA') {
-				heroMovement.left = false;
+				hero.movement.left = false;
 			} else if (event.code === 'KeyD') {
-				heroMovement.right = false;
+				hero.movement.right = false;
 			}
-			if (Object.values(heroMovement).every((value) => !value)) {
+			if (Object.values(hero.movement).every((value) => !value)) {
 				hero.inputs.walking.value = 0;
 			}
 		});
@@ -265,8 +290,8 @@
 	canvas {
 		height: calc(min(100vh, 100vw) - 50px);
 		width: calc(min(100vw, 100vh) - 50px);
-		max-height: 1000px;
-		max-width: 1000px;
+		max-height: 500px;
+		max-width: 500px;
 		background-color: #2a3035;
 		border-radius: 16px;
 	}

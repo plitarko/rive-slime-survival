@@ -11,10 +11,11 @@ export interface Character {
 	inputs: { [key: string]: any };
 	inputNames: string[];
 	mainWrapper: any;
-	direction?: {
-		up: false;
-		down: false;
-		left: false;
-		right: false;
+	movement: {
+		up: boolean;
+		down: boolean;
+		left: boolean;
+		right: boolean;
 	};
+	orientation: 'up' | 'down' | 'left' | 'right';
 }
