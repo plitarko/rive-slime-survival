@@ -1,6 +1,6 @@
 <script lang="ts">
-	import RiveCanvas, { type StateMachineInstance } from '@rive-app/canvas-advanced';
-	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
+	import RiveCanvas, { type StateMachineInstance } from '@rive-app/webgl2-advanced';
+	import riveWASMResource from '@rive-app/webgl2-advanced/rive.wasm';
 	import { onMount } from 'svelte';
 	import { blur } from 'svelte/transition';
 	import GameBro from './GameBro.svelte';

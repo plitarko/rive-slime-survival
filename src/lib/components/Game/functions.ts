@@ -230,7 +230,7 @@ export function isOutOfBounds(
 	return result;
 }
 
-export function getRandomSpawnCoordinates(squareSize = 1000, offset = 200) {
+export function getRandomSpawnCoordinates(squareSize = 1000) {
 	const randomOffset = 2000 * Math.random() + 200;
 	// Define the outer boundary coordinates
 	const minX = -randomOffset;
