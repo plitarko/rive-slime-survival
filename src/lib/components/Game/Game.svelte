@@ -15,13 +15,17 @@
 		checkEnemyCollision,
 		setLinearMovement,
 		applyKnockback,
-		isOutOfBounds
+		isOutOfBounds,
+		getRandomSpawnCoordinates
 	} from './functions';
 
 	let enemies: Character[] = [];
 	let hearts: ArtboardData[] = [];
 	let wave: number = 1;
+	let showingWave: boolean = false;
 	let gameStarted: boolean = false;
+	let showingWaveTimer: number = 0;
+
 	const drawHitboxes = false;
 	const hero: Character = {
 		health: 3,
@@ -63,56 +67,65 @@
 		height: 100
 	};
 	const invincibilityTime = 2;
-	const initialSlimeCount = 10;
+	const initialSlimeCount = 5;
 
-	for (let i = 0; i < initialSlimeCount; i++) {
-		enemies.push({
-			health: 3,
-			maxHealth: 3,
-			speed: 100,
-			hitbox: {
-				width: 88,
-				height: 80
-			},
-			x: 1000 * Math.random(),
-			y: 1000 * Math.random(),
-			artboard: null,
-			altArtboards: [],
-			machine: null,
-			inputs: {},
-			inputNames: ['attack', 'hit', 'die'],
-			mainWrapper: null,
-			movement: {
-				up: false,
-				down: false,
-				left: false,
-				right: false
-			},
-			orientation: 'down',
-			timeSinceLastHit: 0,
-			isDead: false,
-			timeSinceDeath: 0
-		});
+	function addEnemies() {
+		for (let i = 0; i < initialSlimeCount * wave; i++) {
+			const coords = getRandomSpawnCoordinates();
+			enemies.push({
+				health: 3,
+				maxHealth: 3,
+				speed: 100,
+				hitbox: {
+					width: 88,
+					height: 80
+				},
+				x: coords.x,
+				y: coords.y,
+				artboard: null,
+				altArtboards: [],
+				machine: null,
+				inputs: {},
+				inputNames: ['attack', 'hit', 'die'],
+				mainWrapper: null,
+				movement: {
+					up: false,
+					down: false,
+					left: false,
+					right: false
+				},
+				orientation: 'down',
+				timeSinceLastHit: 0,
+				isDead: false,
+				timeSinceDeath: 0
+			});
+		}
 	}
+	addEnemies();
 
 	let lastTime: number;
 	let canvasElement: HTMLCanvasElement;
 	let isSwingingSword = false;
 	let timeSinceSwing = 0;
 
-	async function main() {
-		const rive = await RiveCanvas({
+	let rive: any;
+	let renderer: any;
+	let file: any;
+
+	async function loadRive() {
+		rive = await RiveCanvas({
 			// Loads Wasm bundle
 			locateFile: () => riveWASMResource
 		});
 
 		const canvasRef = canvasElement;
 
-		const renderer = rive.makeRenderer(canvasRef);
+		renderer = rive.makeRenderer(canvasRef);
 		const bytes = await (await fetch(new Request('rive-files/hero_demo.riv'))).arrayBuffer();
-		const file = await rive.load(new Uint8Array(bytes));
+		file = await rive.load(new Uint8Array(bytes));
+	}
 
-		//set up UI
+	function setupUI() {
 		for (let i = 0; i < hero.maxHealth; i++) {
 			const heartArtboard = file.artboardByName('Heart');
 			const heartMainWrapper = heartArtboard.node('main wrapper');
@@ -139,17 +152,20 @@
 
 			hearts.push(heartObject);
 		}
+	}
+
+	function setupHero() {
 		//set up hero
-		const heroArtboard = file.artboardByName('Hero');
-		const heroMainWrapper = heroArtboard.node('main wrapper');
-		heroMainWrapper.scaleX = artboardScale;
-		heroMainWrapper.scaleY = artboardScale;
-		const heroMachine = new rive.StateMachineInstance(
-			heroArtboard.stateMachineByName('State Machine 1'),
-			heroArtboard
+		hero.artboard = file.artboardByName('Hero');
+		hero.mainWrapper = hero.artboard?.node('main wrapper');
+		hero.mainWrapper.scaleX = artboardScale;
+		hero.mainWrapper.scaleY = artboardScale;
+		hero.machine = new rive.StateMachineInstance(
+			hero?.artboard?.stateMachineByName('State Machine 1'),
+			hero.artboard
 		);
 		hero.inputNames.forEach((triggerName) => {
-			hero.inputs[triggerName] = getInputByName(heroMachine, triggerName);
+			hero.inputs[triggerName] = getInputByName(hero?.machine as StateMachineInstance, triggerName);
 		});
 
 		//setup hero splatter artboard
@@ -169,15 +185,17 @@
 				machine: heroSplatterMachine
 			}
 		];
+	}
 
+	function setupEnemies() {
 		//set up enemies
 		enemies.forEach((enemy) => {
 			enemy.artboard = file.artboardByName('Slime');
-			enemy.mainWrapper = enemy.artboard.node('main wrapper');
+			enemy.mainWrapper = enemy.artboard?.node('main wrapper');
 			enemy.mainWrapper.scaleX = artboardScale;
 			enemy.mainWrapper.scaleY = artboardScale;
 			enemy.machine = new rive.StateMachineInstance(
-				enemy.artboard.stateMachineByName('State Machine 1'),
+				enemy.artboard?.stateMachineByName('State Machine 1'),
 				enemy.artboard
 			);
 			enemy.inputNames.forEach((triggerName) => {
@@ -201,173 +219,214 @@
 				{ artboard: splatterArtboard, mainWrapper: splatterMainWrapper, machine: splatterMachine }
 			];
 		});
+	}
 
-		function gameLoop(time: number) {
-			if (!lastTime) {
-				lastTime = time;
-			}
-			const elapsedTimeMs = time - lastTime;
-			const elapsedTimeSec = elapsedTimeMs / 1000;
+	function gameLoop(time: number) {
+		if (!lastTime) {
 			lastTime = time;
-			hero.timeSinceLastHit += elapsedTimeSec;
+		}
+		const elapsedTimeMs = time - lastTime;
+		const elapsedTimeSec = elapsedTimeMs / 1000;
+		lastTime = time;
+		hero.timeSinceLastHit += elapsedTimeSec;
 
-			renderer.clear();
+		renderer.clear();
 
-			if (!gameStarted) {
-				//draw hero
-				heroArtboard.advance(elapsedTimeSec);
-				heroMachine.advance(elapsedTimeSec);
-				heroMainWrapper.x = hero.x;
-				heroMainWrapper.y = hero.y;
-				heroArtboard.draw(renderer);
-				rive.requestAnimationFrame(gameLoop);
-				return;
-			}
-
-			function playSplatter(character: Character, isHero = false) {
-				const splatter = character.altArtboards[0];
-				if (isHero) {
-					const isBlue = getInputByName(splatter.machine, 'isBlue');
-					if (isBlue) isBlue.value = 1;
-				}
-				splatter?.artboard.advance(elapsedTimeSec);
-				splatter?.machine.advance(elapsedTimeSec);
-				if (splatter?.mainWrapper) {
-					splatter.mainWrapper.x = character.x;
-					splatter.mainWrapper.y = character.y;
-				}
-				splatter?.artboard.draw(renderer);
-			}
-
-			if (hero.isDead) {
-				playSplatter(hero, true);
-			}
-
-			//sort enemies
-			enemies = [...enemies.sort((a, b) => a.y - b.y)];
-
-			//draw enemies
-			enemies.forEach((enemy) => {
-				setLinearMovement(elapsedTimeSec, enemy, hero);
-				enemy?.artboard?.advance(elapsedTimeSec);
-				enemy?.machine?.advance(elapsedTimeSec);
-				enemy?.artboard?.draw(renderer);
-				enemy.mainWrapper.x = enemy.x;
-				enemy.mainWrapper.y = enemy.y;
-			});
-
-			//check for collisions with enemies
-			enemies.forEach((enemy) => {
-				//check if enemy is dead
-				if (enemy.health <= 0) {
-					enemy.isDead = true;
-					if (enemy.timeSinceDeath > 2) {
-						enemies = enemies.filter((e) => e !== enemy);
-					}
-					if (enemy.timeSinceDeath > 0) {
-						enemy.inputs.die.fire();
-						playSplatter(enemy);
-					}
-					enemy.timeSinceDeath += elapsedTimeSec;
-				}
-
-				if (!enemy.isDead && hero.timeSinceLastHit > invincibilityTime) {
-					if (checkEnemyCollision(hero, enemy)) {
-						hero.health -= 1;
-						hearts[hero.health]?.inputs['lose heart']?.fire();
-						enemy.inputs.attack.fire();
-						if (hero.health <= 0) {
-							hero.isDead = true;
-							return;
-						} else {
-							hero.inputs.hit.fire();
-							hero.timeSinceLastHit = 0;
-						}
-
-						//knockback if not out of bounds
-						if (
-							!isOutOfBounds(hero, levelBoundaries).x &&
-							!isOutOfBounds(hero, levelBoundaries).y
-						) {
-							applyKnockback(hero, enemy, 100, levelBoundaries, false);
-						}
-					}
-				}
-			});
-
+		if (!gameStarted) {
 			//draw hero
-			if (!hero.isDead) {
-				const boostFactor = hero.timeSinceLastHit < invincibilityTime ? 1.5 : 1;
-				setHeroMovement(elapsedTimeSec, hero, levelBoundaries, boostFactor);
-				heroArtboard.advance(elapsedTimeSec);
-				heroMachine.advance(elapsedTimeSec);
-				heroMainWrapper.x = hero.x;
-				heroMainWrapper.y = hero.y;
-				heroArtboard.draw(renderer);
-				renderer.save();
+			hero?.artboard?.advance(elapsedTimeSec);
+			hero?.machine?.advance(elapsedTimeSec);
+			hero.mainWrapper.x = hero.x;
+			hero.mainWrapper.y = hero.y;
+			hero?.artboard?.draw(renderer);
+			rive.requestAnimationFrame(gameLoop);
+			return;
+		}
+
+		function playSplatter(character: Character, isHero = false) {
+			const splatter = character.altArtboards[0];
+			if (isHero) {
+				const isBlue = getInputByName(splatter.machine, 'isBlue');
+				if (isBlue) isBlue.value = 1;
+			}
+			splatter?.artboard.advance(elapsedTimeSec);
+			splatter?.machine.advance(elapsedTimeSec);
+			if (splatter?.mainWrapper) {
+				splatter.mainWrapper.x = character.x;
+				splatter.mainWrapper.y = character.y;
+			}
+			splatter?.artboard.draw(renderer);
+		}
+
+		if (hero.isDead) {
+			playSplatter(hero, true);
+		}
+
+		//sort enemies
+		enemies = [...enemies.sort((a, b) => a.y - b.y)];
+
+		//draw enemies
+		enemies.forEach((enemy) => {
+			setLinearMovement(elapsedTimeSec, enemy, hero);
+			enemy?.artboard?.advance(elapsedTimeSec);
+			enemy?.machine?.advance(elapsedTimeSec);
+			enemy?.artboard?.draw(renderer);
+			enemy.mainWrapper.x = enemy?.x;
+			enemy.mainWrapper.y = enemy?.y;
+		});
+
+		//check for collisions with enemies
+		enemies.forEach((enemy) => {
+			//check if enemy is dead
+			if (enemy.health <= 0) {
+				enemy.isDead = true;
+				if (enemy.timeSinceDeath > 2) {
+					enemies = enemies.filter((e) => e !== enemy);
+				}
+				if (enemy.timeSinceDeath > 0) {
+					enemy.inputs.die.fire();
+					playSplatter(enemy);
+				}
+				enemy.timeSinceDeath += elapsedTimeSec;
 			}
 
-			//draw hearts
-			hearts.forEach((heart, index) => {
-				heart.artboard.advance(elapsedTimeSec);
-				heart.machine.advance(elapsedTimeSec);
-				heart.artboard.draw(renderer);
+			if (!enemy.isDead && hero.timeSinceLastHit > invincibilityTime) {
+				if (checkEnemyCollision(hero, enemy)) {
+					hero.health -= 1;
+					hearts[hero.health]?.inputs['lose heart']?.fire();
+					enemy.inputs.attack.fire();
+					if (hero.health <= 0) {
+						hero.isDead = true;
+						return;
+					} else {
+						hero.inputs.hit.fire();
+						hero.timeSinceLastHit = 0;
+					}
+
+					//knockback if not out of bounds
+					if (!isOutOfBounds(hero, levelBoundaries).x && !isOutOfBounds(hero, levelBoundaries).y) {
+						applyKnockback(hero, enemy, 100, levelBoundaries, false);
+					}
+				}
+			}
+		});
+
+		//draw hero
+		if (!hero.isDead) {
+			const boostFactor = hero.timeSinceLastHit < invincibilityTime ? 1.5 : 1;
+			setHeroMovement(elapsedTimeSec, hero, levelBoundaries, boostFactor);
+			hero.artboard?.advance(elapsedTimeSec);
+			hero.machine?.advance(elapsedTimeSec);
+			hero.mainWrapper.x = hero.x;
+			hero.mainWrapper.y = hero.y;
+			hero.artboard?.draw(renderer);
+			renderer.save();
+		}
+
+		//draw hearts
+		hearts.forEach((heart, index) => {
+			heart.artboard.advance(elapsedTimeSec);
+			heart.machine.advance(elapsedTimeSec);
+			heart.artboard.draw(renderer);
+		});
+
+		//draw hitboxes
+		if (drawHitboxes) {
+			//@ts-ignore
+			renderer.fillStyle = 'rgba(255, 0, 0, 0.5)';
+
+			const heroRect = getCharacterRect(hero);
+			//@ts-ignore
+			renderer.fillRect(heroRect.x, heroRect.y, heroRect.width, heroRect.height);
+
+			enemies.forEach((enemy) => {
+				const enemyRect = getCharacterRect(enemy);
+				//@ts-ignore
+				renderer.fillRect(enemyRect.x, enemyRect.y, enemyRect.width, enemyRect.height);
+			});
+		}
+
+		//check for sword hit
+		if (isSwingingSword) {
+			timeSinceSwing += elapsedTimeSec;
+			if (timeSinceSwing > 0.2) {
+				isSwingingSword = false;
+				timeSinceSwing = 0;
+			}
+			enemies.forEach((enemy) => {
+				if (enemy.isDead) return;
+				if (checkSwordHit(hero, enemy, swordHitbox)) {
+					enemy.health -= 1;
+					enemy.inputs.hit.fire();
+					applyKnockback(enemy, hero, 50, levelBoundaries, false);
+				}
 			});
 
-			//draw hitboxes
 			if (drawHitboxes) {
 				//@ts-ignore
 				renderer.fillStyle = 'rgba(255, 0, 0, 0.5)';
-
-				const heroRect = getCharacterRect(hero);
+				//draw sword hitbox
+				const swordRect = getSwordRect(hero, swordHitbox);
 				//@ts-ignore
-				renderer.fillRect(heroRect.x, heroRect.y, heroRect.width, heroRect.height);
-
-				enemies.forEach((enemy) => {
-					const enemyRect = getCharacterRect(enemy);
-					//@ts-ignore
-					renderer.fillRect(enemyRect.x, enemyRect.y, enemyRect.width, enemyRect.height);
-				});
+				renderer.fillRect(swordRect.x, swordRect.y, swordRect.width, swordRect.height);
 			}
-
-			//check for sword hit
-			if (isSwingingSword) {
-				timeSinceSwing += elapsedTimeSec;
-				if (timeSinceSwing > 0.2) {
-					isSwingingSword = false;
-					timeSinceSwing = 0;
-				}
-				enemies.forEach((enemy) => {
-					if (enemy.isDead) return;
-					if (checkSwordHit(hero, enemy, swordHitbox)) {
-						enemy.health -= 1;
-						enemy.inputs.hit.fire();
-						applyKnockback(enemy, hero, 50, levelBoundaries, false);
-					}
-				});
-
-				if (drawHitboxes) {
-					//@ts-ignore
-					renderer.fillStyle = 'rgba(255, 0, 0, 0.5)';
-					//draw sword hitbox
-					const swordRect = getSwordRect(hero, swordHitbox);
-					//@ts-ignore
-					renderer.fillRect(swordRect.x, swordRect.y, swordRect.width, swordRect.height);
-				}
-			}
-
-			rive.requestAnimationFrame(gameLoop);
 		}
+
+		//show wave announcemnt if all enmies are dead
+		if (enemies.every((enemy) => enemy.isDead) && !showingWave) {
+			wave += 1;
+			showingWave = true;
+		}
+
+		// check if wave announcement is over
+		if (showingWave && showingWaveTimer < 5) {
+			showingWaveTimer += elapsedTimeSec;
+		} else {
+			showingWave = false;
+			showingWaveTimer = 0;
+		}
+
+		//generate next level if all enemies are dead
+		if (
+			enemies.every((enemy) => enemy.isDead) &&
+			enemies.every((enemy) => enemy.timeSinceDeath > 2)
+		) {
+			addEnemies();
+			setupEnemies();
+			rive.requestAnimationFrame(gameLoop);
+			return;
+		}
+
 		rive.requestAnimationFrame(gameLoop);
 	}
 
 	onMount(() => {
-		main();
+		loadRive().then(() => {
+			setupUI();
+			setupHero();
+			setupEnemies();
+			rive.requestAnimationFrame(gameLoop);
+		});
 		addEventListener('keydown', (event) => {
-			if (!gameStarted) {
+			if (!gameStarted || hero.isDead) {
 				if (event.code === 'Space') {
 					gameStarted = true;
 					hero.inputs.attack.fire();
+					showingWave = true;
+					if (hero.isDead) {
+						enemies = [];
+						hero.isDead = false;
+						hero.health = hero.maxHealth;
+						hero.orientation = 'down';
+						hero.x = 500;
+						hero.y = 450;
+						hearts.forEach((heart) => {
+							heart.inputs['fill heart'].fire();
+						});
+						wave = 1;
+						setupHero();
+						setupEnemies();
+					}
 				}
 				return;
 			}
@@ -422,12 +481,22 @@
 <div class="wrapper">
 	<div class="game-window">
 		<canvas height="1000" width="1000" bind:this={canvasElement}></canvas>
-		{#if !gameStarted}
-			<div transition:blur class="start-game-menu">
-				<span>PRESS SPACE TO START</span>
-				<div class="controls-wrapper">
-					<Controls />
-				</div>
+		{#if showingWave}
+			<div transition:blur class="wave-counter">
+				<span>Wave {wave}</span>
+			</div>
+		{/if}
+		{#if !gameStarted || hero.isDead}
+			<div class="start-game-menu">
+				{#if hero.isDead}
+					<span>GAME OVER</span>
+					<span>Press SPACE to play again</span>
+				{:else}
+					<span>Press SPACE to start</span>
+					<div class="controls-wrapper">
+						<Controls />
+					</div>
+				{/if}
 			</div>
 		{/if}
 		<div class="game-bro-wrapper">
@@ -510,5 +579,19 @@
 	.controls-wrapper {
 		height: 40%;
 		width: 40%;
+	}
+
+	.wave-counter {
+		margin-top: -140%;
+		padding: 6px;
+		height: 100%;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		font-size: 24px;
+		color: #576c7b;
 	}
 </style>

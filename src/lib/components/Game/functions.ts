@@ -229,3 +229,27 @@ export function isOutOfBounds(
 	}
 	return result;
 }
+
+export function getRandomSpawnCoordinates(squareSize = 1000, offset = 200) {
+	const randomOffset = 2000 * Math.random() + 200;
+	// Define the outer boundary coordinates
+	const minX = -randomOffset;
+	const maxX = squareSize + randomOffset;
+	const minY = -randomOffset;
+	const maxY = squareSize + randomOffset;
+
+	let x, y;
+
+	// Randomly decide to place the point on the horizontal or vertical axis
+	if (Math.random() < 0.5) {
+		// Horizontal axis (left or right)
+		x = Math.random() < 0.5 ? minX : maxX;
+		y = Math.random() * (maxY - minY) + minY;
+	} else {
+		// Vertical axis (top or bottom)
+		y = Math.random() < 0.5 ? minY : maxY;
+		x = Math.random() * (maxX - minX) + minX;
+	}
+
+	return { x, y };
+}
