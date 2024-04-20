@@ -83,14 +83,15 @@ export function getSwordRect(
 export function setHeroMovement(
 	elapsedTimeSec: number,
 	hero: Character,
-	levelBoundaries: { maxX: number; maxY: number; minX: number; minY: number }
+	levelBoundaries: { maxX: number; maxY: number; minX: number; minY: number },
+	boostFactor: number = 1
 ): void {
 	// Determine if the movement is diagonal to adjust the speed accordingly
 	const isDiagonal =
 		(hero.movement.up || hero.movement.down) && (hero.movement.left || hero.movement.right);
 	const movementSpeed = isDiagonal
-		? (hero.speed / Math.sqrt(2)) * elapsedTimeSec
-		: hero.speed * elapsedTimeSec;
+		? (hero.speed / Math.sqrt(2)) * elapsedTimeSec * boostFactor
+		: hero.speed * elapsedTimeSec * boostFactor;
 
 	// Adjust the hero's position based on movement direction, ensuring they do not exit the level boundaries
 	if (hero.movement.up && hero.y - movementSpeed >= levelBoundaries.minY) {

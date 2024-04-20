@@ -2,8 +2,9 @@
 import type { Artboard, StateMachineInstance } from '@rive-app/canvas-advanced';
 
 export interface Character {
-	speed: number;
 	health: number;
+	maxHealth: number;
+	speed: number;
 	hitbox: { width: number; height: number };
 	x: number;
 	y: number;
@@ -20,7 +21,15 @@ export interface Character {
 		right: boolean;
 	};
 	orientation: 'up' | 'down' | 'left' | 'right';
-	timeSinceLastHit: number,
+	timeSinceLastHit: number;
 	isDead: boolean;
 	timeSinceDeath: number;
+}
+
+export interface ArtboardData {
+	artboard: Artboard;
+	mainWrapper: any;
+	machine: StateMachineInstance;
+	inputs: { [key: string]: any };
+	inputNames: string[];
 }

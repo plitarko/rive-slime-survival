@@ -3,7 +3,7 @@
 	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
 	import { onMount } from 'svelte';
 	import GameBro from './GameBro.svelte';
-	import type { Character } from './types';
+	import type { Character, ArtboardData } from './types';
 	import {
 		getInputByName,
 		getCharacterRect,
@@ -18,8 +18,10 @@
 
 	const drawHitboxes = false;
 	let enemies: Character[] = [];
+	let hearts: ArtboardData[] = [];
 	const hero: Character = {
 		health: 3,
+		maxHealth: 3,
 		speed: 500,
 		hitbox: {
 			width: 100,
@@ -62,6 +64,7 @@
 	for (let i = 0; i < initialSlimeCount; i++) {
 		enemies.push({
 			health: 3,
+			maxHealth: 3,
 			speed: 100,
 			hitbox: {
 				width: 88,
@@ -105,6 +108,33 @@
 		const bytes = await (await fetch(new Request('rive-files/hero_demo.riv'))).arrayBuffer();
 		const file = await rive.load(new Uint8Array(bytes));
 
+		//set up UI
+		for (let i = 0; i < hero.maxHealth; i++) {
+			const heartArtboard = file.artboardByName('Heart');
+			const heartMainWrapper = heartArtboard.node('main wrapper');
+			const heartMachine = new rive.StateMachineInstance(
+				heartArtboard.stateMachineByName('State Machine 1'),
+				heartArtboard
+			);
+			heartMainWrapper.scaleX = artboardScale;
+			heartMainWrapper.scaleY = artboardScale;
+			heartMainWrapper.x = 50 + i * 60;
+			heartMainWrapper.y = 50;
+
+			const heartObject: ArtboardData = {
+				artboard: heartArtboard,
+				machine: heartMachine,
+				mainWrapper: heartMainWrapper,
+				inputNames: ['fill heart', 'lose heart'],
+				inputs: {}
+			};
+
+			heartObject.inputNames.forEach((triggerName) => {
+				heartObject.inputs[triggerName] = getInputByName(heartObject.machine, triggerName);
+			});
+
+			hearts.push(heartObject);
+		}
 		//set up hero
 		const heroArtboard = file.artboardByName('Hero');
 		const heroMainWrapper = heroArtboard.node('main wrapper');
@@ -229,6 +259,7 @@
 				if (!enemy.isDead && hero.timeSinceLastHit > invincibilityTime) {
 					if (checkEnemyCollision(hero, enemy)) {
 						hero.health -= 1;
+						hearts[hero.health]?.inputs['lose heart']?.fire();
 						enemy.inputs.attack.fire();
 						if (hero.health <= 0) {
 							hero.isDead = true;
@@ -251,7 +282,8 @@
 
 			//draw hero
 			if (!hero.isDead) {
-				setHeroMovement(elapsedTimeSec, hero, levelBoundaries);
+				const boostFactor = hero.timeSinceLastHit < invincibilityTime ? 1.5 : 1;
+				setHeroMovement(elapsedTimeSec, hero, levelBoundaries, boostFactor);
 				heroArtboard.advance(elapsedTimeSec);
 				heroMachine.advance(elapsedTimeSec);
 				heroMainWrapper.x = hero.x;
@@ -259,6 +291,13 @@
 				heroArtboard.draw(renderer);
 				renderer.save();
 			}
+
+			//draw hearts
+			hearts.forEach((heart, index) => {
+				heart.artboard.advance(elapsedTimeSec);
+				heart.machine.advance(elapsedTimeSec);
+				heart.artboard.draw(renderer);
+			});
 
 			//draw hitboxes
 			if (drawHitboxes) {
@@ -377,7 +416,7 @@
 		width: 100vw;
 		width: 100svw;
 		background-color: #22282c;
-		background: linear-gradient(180deg, rgb(40, 46, 51) 0%, #181d20 100%);
+		background: linear-gradient(0deg, #181d20 0%, rgb(40, 46, 51) 100%);
 		@media screen and (max-width: 850px) {
 			display: block;
 			padding-left: 19.5vw;
