@@ -2,7 +2,9 @@
 	import RiveCanvas, { type StateMachineInstance } from '@rive-app/canvas-advanced';
 	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
 	import { onMount } from 'svelte';
+	import { blur } from 'svelte/transition';
 	import GameBro from './GameBro.svelte';
+	import Controls from './Controls.svelte';
 	import type { Character, ArtboardData } from './types';
 	import {
 		getInputByName,
@@ -16,9 +18,11 @@
 		isOutOfBounds
 	} from './functions';
 
-	const drawHitboxes = false;
 	let enemies: Character[] = [];
 	let hearts: ArtboardData[] = [];
+	let wave: number = 1;
+	let gameStarted: boolean = false;
+	const drawHitboxes = false;
 	const hero: Character = {
 		health: 3,
 		maxHealth: 3,
@@ -209,6 +213,17 @@
 
 			renderer.clear();
 
+			if (!gameStarted) {
+				//draw hero
+				heroArtboard.advance(elapsedTimeSec);
+				heroMachine.advance(elapsedTimeSec);
+				heroMainWrapper.x = hero.x;
+				heroMainWrapper.y = hero.y;
+				heroArtboard.draw(renderer);
+				rive.requestAnimationFrame(gameLoop);
+				return;
+			}
+
 			function playSplatter(character: Character, isHero = false) {
 				const splatter = character.altArtboards[0];
 				if (isHero) {
@@ -349,6 +364,13 @@
 	onMount(() => {
 		main();
 		addEventListener('keydown', (event) => {
+			if (!gameStarted) {
+				if (event.code === 'Space') {
+					gameStarted = true;
+					hero.inputs.attack.fire();
+				}
+				return;
+			}
 			if (event.code === 'KeyW') {
 				hero.movement.up = true;
 				hero.inputs.up.fire();
@@ -378,6 +400,7 @@
 		});
 
 		addEventListener('keyup', (event) => {
+			if (!gameStarted) return;
 			if (event.code === 'KeyW') {
 				hero.movement.up = false;
 			} else if (event.code === 'KeyS') {
@@ -399,13 +422,21 @@
 <div class="wrapper">
 	<div class="game-window">
 		<canvas height="1000" width="1000" bind:this={canvasElement}></canvas>
+		{#if !gameStarted}
+			<div transition:blur class="start-game-menu">
+				<span>PRESS SPACE TO START</span>
+				<div class="controls-wrapper">
+					<Controls />
+				</div>
+			</div>
+		{/if}
 		<div class="game-bro-wrapper">
 			<GameBro />
 		</div>
 	</div>
 </div>
 
-<style>
+<style lang="postcss">
 	.wrapper {
 		display: flex;
 		justify-content: center;
@@ -422,6 +453,7 @@
 			padding-left: 19.5vw;
 		}
 	}
+
 	.game-window {
 		position: relative;
 		height: calc(min(100vh, 100vw) - 30px);
@@ -429,7 +461,6 @@
 		max-height: 500px;
 		max-width: 500px;
 		margin-top: -100px;
-
 		@media screen and (max-height: 750px) {
 			margin-top: unset;
 		}
@@ -439,12 +470,14 @@
 			margin-top: 23%;
 		}
 	}
+
 	canvas {
 		height: 100%;
 		width: 100%;
 		background-color: #2a3035;
 		background: linear-gradient(180deg, #1e262b 0%, rgb(39, 46, 53) 100%);
 	}
+
 	.game-bro-wrapper {
 		position: absolute;
 		top: -26.8%;
@@ -452,5 +485,30 @@
 		height: 266%;
 		width: 266%;
 		opacity: 0.5;
+	}
+
+	.start-game-menu {
+		margin-top: -100%;
+		padding: 6px;
+		padding-top: 50%;
+		height: 100%;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		font-size: 24px;
+		color: #576c7b;
+		gap: 10px;
+
+		@media screen and (max-width: 850px) {
+			font-size: 16px;
+		}
+	}
+
+	.controls-wrapper {
+		height: 40%;
+		width: 40%;
 	}
 </style>
