@@ -398,7 +398,7 @@
 			return;
 		}
 		renderer.restore();
-d
+
 		rive.requestAnimationFrame(gameLoop);
 	}
 
