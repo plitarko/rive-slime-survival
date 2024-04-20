@@ -557,6 +557,7 @@
 	}
 
 	.start-game-menu {
+		position: relative;
 		margin-top: -100%;
 		padding: 6px;
 		padding-top: 50%;
@@ -582,6 +583,7 @@
 	}
 
 	.wave-counter {
+		position: relative;
 		margin-top: -140%;
 		padding: 6px;
 		height: 100%;
