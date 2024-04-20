@@ -40,6 +40,7 @@
 			right: false
 		},
 		orientation: 'down',
+		timeSinceLastHit: 2,
 		isDead: false,
 		timeSinceDeath: 0
 	};
@@ -55,6 +56,7 @@
 		width: 200,
 		height: 100
 	};
+	const invincibilityTime = 2;
 	const initialSlimeCount = 10;
 
 	for (let i = 0; i < initialSlimeCount; i++) {
@@ -80,6 +82,7 @@
 				right: false
 			},
 			orientation: 'down',
+			timeSinceLastHit: 0,
 			isDead: false,
 			timeSinceDeath: 0
 		});
@@ -102,7 +105,7 @@
 		const bytes = await (await fetch(new Request('rive-files/hero_demo.riv'))).arrayBuffer();
 		const file = await rive.load(new Uint8Array(bytes));
 
-		//setup hero
+		//set up hero
 		const heroArtboard = file.artboardByName('Hero');
 		const heroMainWrapper = heroArtboard.node('main wrapper');
 		heroMainWrapper.scaleX = artboardScale;
@@ -115,7 +118,25 @@
 			hero.inputs[triggerName] = getInputByName(heroMachine, triggerName);
 		});
 
-		//setup enemies
+		//setup hero splatter artboard
+		const heroSplatterArtboard = file.artboardByName('Splatter');
+		const heroSplatterMachine = new rive.StateMachineInstance(
+			heroSplatterArtboard.stateMachineByName('State Machine 1'),
+			heroSplatterArtboard
+		);
+		const splatterMainWrapper = heroSplatterArtboard.node('main wrapper');
+		splatterMainWrapper.scaleX = artboardScale;
+		splatterMainWrapper.scaleY = artboardScale;
+		hero.altArtboards = [
+			...hero.altArtboards,
+			{
+				artboard: heroSplatterArtboard,
+				mainWrapper: splatterMainWrapper,
+				machine: heroSplatterMachine
+			}
+		];
+
+		//set up enemies
 		enemies.forEach((enemy) => {
 			enemy.artboard = file.artboardByName('Slime');
 			enemy.mainWrapper = enemy.artboard.node('main wrapper');
@@ -154,8 +175,28 @@
 			const elapsedTimeMs = time - lastTime;
 			const elapsedTimeSec = elapsedTimeMs / 1000;
 			lastTime = time;
+			hero.timeSinceLastHit += elapsedTimeSec;
 
 			renderer.clear();
+
+			function playSplatter(character: Character, isHero = false) {
+				const splatter = character.altArtboards[0];
+				if (isHero) {
+					const isBlue = getInputByName(splatter.machine, 'isBlue');
+					if (isBlue) isBlue.value = 1;
+				}
+				splatter?.artboard.advance(elapsedTimeSec);
+				splatter?.machine.advance(elapsedTimeSec);
+				if (splatter?.mainWrapper) {
+					splatter.mainWrapper.x = character.x;
+					splatter.mainWrapper.y = character.y;
+				}
+				splatter?.artboard.draw(renderer);
+			}
+
+			if (hero.isDead) {
+				playSplatter(hero, true);
+			}
 
 			//sort enemies
 			enemies = [...enemies.sort((a, b) => a.y - b.y)];
@@ -185,10 +226,17 @@
 					enemy.timeSinceDeath += elapsedTimeSec;
 				}
 
-				if (!enemy.isDead) {
+				if (!enemy.isDead && hero.timeSinceLastHit > invincibilityTime) {
 					if (checkEnemyCollision(hero, enemy)) {
-						hero.inputs.hit.fire();
+						hero.health -= 1;
 						enemy.inputs.attack.fire();
+						if (hero.health <= 0) {
+							hero.isDead = true;
+							return;
+						} else {
+							hero.inputs.hit.fire();
+							hero.timeSinceLastHit = 0;
+						}
 
 						//knockback if not out of bounds
 						if (
@@ -199,27 +247,18 @@
 						}
 					}
 				}
-
-				function playSplatter(enemy: Character) {
-					const splatter = enemy.altArtboards[0];
-					splatter?.artboard.advance(elapsedTimeSec);
-					splatter?.machine.advance(elapsedTimeSec);
-					if (splatter?.mainWrapper) {
-						splatter.mainWrapper.x = enemy.x;
-						splatter.mainWrapper.y = enemy.y;
-					}
-					splatter?.artboard.draw(renderer);
-				}
 			});
 
 			//draw hero
-			setHeroMovement(elapsedTimeSec, hero, levelBoundaries);
-			heroArtboard.advance(elapsedTimeSec);
-			heroMachine.advance(elapsedTimeSec);
-			heroMainWrapper.x = hero.x;
-			heroMainWrapper.y = hero.y;
-			heroArtboard.draw(renderer);
-			renderer.save();
+			if (!hero.isDead) {
+				setHeroMovement(elapsedTimeSec, hero, levelBoundaries);
+				heroArtboard.advance(elapsedTimeSec);
+				heroMachine.advance(elapsedTimeSec);
+				heroMainWrapper.x = hero.x;
+				heroMainWrapper.y = hero.y;
+				heroArtboard.draw(renderer);
+				renderer.save();
+			}
 
 			//draw hitboxes
 			if (drawHitboxes) {

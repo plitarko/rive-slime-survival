@@ -5,7 +5,7 @@ export function getInputByName(machine: StateMachineInstance, inputName: string)
 	for (let i = 0, l = machine.inputCount(); i < l; i++) {
 		const input = machine.input(i);
 		if (input.name === inputName) {
-			if (inputName === 'walking') {
+			if (inputName === 'walking' || inputName === 'isBlue') {
 				return input.asBool();
 			} else {
 				return input.asTrigger();

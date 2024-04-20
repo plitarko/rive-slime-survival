@@ -20,6 +20,7 @@ export interface Character {
 		right: boolean;
 	};
 	orientation: 'up' | 'down' | 'left' | 'right';
+	timeSinceLastHit: number,
 	isDead: boolean;
 	timeSinceDeath: number;
 }
