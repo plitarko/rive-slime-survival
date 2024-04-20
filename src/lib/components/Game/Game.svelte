@@ -1,5 +1,6 @@
 <script lang="ts">
 	import RiveCanvas, { type StateMachineInstance } from '@rive-app/canvas-advanced';
+	// @ts-ignore
 	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
 	import { onMount } from 'svelte';
 	import { blur } from 'svelte/transition';
