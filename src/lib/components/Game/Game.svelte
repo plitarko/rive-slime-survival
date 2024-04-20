@@ -321,7 +321,6 @@
 			hero.mainWrapper.x = hero.x;
 			hero.mainWrapper.y = hero.y;
 			hero.artboard?.draw(renderer);
-			renderer.save();
 		}
 
 		//draw hearts
@@ -346,6 +345,7 @@
 				renderer.fillRect(enemyRect.x, enemyRect.y, enemyRect.width, enemyRect.height);
 			});
 		}
+		renderer.save();
 
 		//check for sword hit
 		if (isSwingingSword) {
@@ -397,7 +397,8 @@
 			rive.requestAnimationFrame(gameLoop);
 			return;
 		}
-
+		renderer.restore();
+d
 		rive.requestAnimationFrame(gameLoop);
 	}
 
