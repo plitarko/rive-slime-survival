@@ -8,6 +8,7 @@ export interface Character {
 	x: number;
 	y: number;
 	artboard: Artboard | null;
+	altArtboards: { artboard: Artboard; mainWrapper: any; machine: StateMachineInstance }[] | [];
 	machine: StateMachineInstance | null;
 	inputs: { [key: string]: any };
 	inputNames: string[];
@@ -19,4 +20,6 @@ export interface Character {
 		right: boolean;
 	};
 	orientation: 'up' | 'down' | 'left' | 'right';
+	isDead: boolean;
+	timeSinceDeath: number;
 }

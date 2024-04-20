@@ -28,6 +28,7 @@
 		x: 500,
 		y: 450,
 		artboard: null,
+		altArtboards: [],
 		machine: null,
 		inputs: {},
 		inputNames: ['attack', 'hit', 'walking', 'up', 'down', 'left', 'right'],
@@ -38,7 +39,9 @@
 			left: false,
 			right: false
 		},
-		orientation: 'down'
+		orientation: 'down',
+		isDead: false,
+		timeSinceDeath: 0
 	};
 
 	const artboardScale = 4; //determines how big individual artboards are drawn
@@ -52,7 +55,7 @@
 		width: 200,
 		height: 100
 	};
-	const initialSlimeCount = 5;
+	const initialSlimeCount = 10;
 
 	for (let i = 0; i < initialSlimeCount; i++) {
 		enemies.push({
@@ -65,9 +68,10 @@
 			x: 1000 * Math.random(),
 			y: 1000 * Math.random(),
 			artboard: null,
+			altArtboards: [],
 			machine: null,
 			inputs: {},
-			inputNames: ['attack', 'hit'],
+			inputNames: ['attack', 'hit', 'die'],
 			mainWrapper: null,
 			movement: {
 				up: false,
@@ -75,7 +79,9 @@
 				left: false,
 				right: false
 			},
-			orientation: 'down'
+			orientation: 'down',
+			isDead: false,
+			timeSinceDeath: 0
 		});
 	}
 
@@ -125,6 +131,20 @@
 					triggerName
 				);
 			});
+
+			//setup slime splatter
+			const splatterArtboard = file.artboardByName('Splatter');
+			const splatterMachine = new rive.StateMachineInstance(
+				splatterArtboard.stateMachineByName('State Machine 1'),
+				splatterArtboard
+			);
+			const splatterMainWrapper = splatterArtboard.node('main wrapper');
+			splatterMainWrapper.scaleX = artboardScale;
+			splatterMainWrapper.scaleY = artboardScale;
+			enemy.altArtboards = [
+				...enemy.altArtboards,
+				{ artboard: splatterArtboard, mainWrapper: splatterMainWrapper, machine: splatterMachine }
+			];
 		});
 
 		function gameLoop(time: number) {
@@ -150,6 +170,48 @@
 				enemy.mainWrapper.y = enemy.y;
 			});
 
+			//check for collisions with enemies
+			enemies.forEach((enemy) => {
+				//check if enemy is dead
+				if (enemy.health <= 0) {
+					enemy.isDead = true;
+					if (enemy.timeSinceDeath > 2) {
+						enemies = enemies.filter((e) => e !== enemy);
+					}
+					if (enemy.timeSinceDeath > 0) {
+						enemy.inputs.die.fire();
+						playSplatter(enemy);
+					}
+					enemy.timeSinceDeath += elapsedTimeSec;
+				}
+
+				if (!enemy.isDead) {
+					if (checkEnemyCollision(hero, enemy)) {
+						hero.inputs.hit.fire();
+						enemy.inputs.attack.fire();
+
+						//knockback if not out of bounds
+						if (
+							!isOutOfBounds(hero, levelBoundaries).x &&
+							!isOutOfBounds(hero, levelBoundaries).y
+						) {
+							applyKnockback(hero, enemy, 100, levelBoundaries, false);
+						}
+					}
+				}
+
+				function playSplatter(enemy: Character) {
+					const splatter = enemy.altArtboards[0];
+					splatter?.artboard.advance(elapsedTimeSec);
+					splatter?.machine.advance(elapsedTimeSec);
+					if (splatter?.mainWrapper) {
+						splatter.mainWrapper.x = enemy.x;
+						splatter.mainWrapper.y = enemy.y;
+					}
+					splatter?.artboard.draw(renderer);
+				}
+			});
+
 			//draw hero
 			setHeroMovement(elapsedTimeSec, hero, levelBoundaries);
 			heroArtboard.advance(elapsedTimeSec);
@@ -158,19 +220,6 @@
 			heroMainWrapper.y = hero.y;
 			heroArtboard.draw(renderer);
 			renderer.save();
-
-			//check for collisions with enemies
-			enemies.forEach((enemy) => {
-				if (checkEnemyCollision(hero, enemy)) {
-					hero.inputs.hit.fire();
-					enemy.inputs.attack.fire();
-
-					//knockback if not out of bounds
-					if (!isOutOfBounds(hero, levelBoundaries).x && !isOutOfBounds(hero, levelBoundaries).y) {
-						applyKnockback(hero, enemy, 100, levelBoundaries, false);
-					}
-				}
-			});
 
 			//draw hitboxes
 			if (drawHitboxes) {
@@ -196,11 +245,9 @@
 					timeSinceSwing = 0;
 				}
 				enemies.forEach((enemy) => {
+					if (enemy.isDead) return;
 					if (checkSwordHit(hero, enemy, swordHitbox)) {
 						enemy.health -= 1;
-						if (enemy.health <= 0) {
-							enemies = enemies.filter((e) => e !== enemy);
-						}
 						enemy.inputs.hit.fire();
 						applyKnockback(enemy, hero, 50, levelBoundaries, false);
 					}
@@ -263,7 +310,9 @@
 				hero.movement.right = false;
 			}
 			if (Object.values(hero.movement).every((value) => !value)) {
-				hero.inputs.walking.value = 0;
+				if (hero.inputs.walking) {
+					hero.inputs.walking.value = 0;
+				}
 			}
 		});
 	});

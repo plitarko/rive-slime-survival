@@ -119,6 +119,9 @@ export function setHeroMovement(
 }
 
 export function setLinearMovement(elapsedTimeSec: number, character: Character, target: Character) {
+	if (character.isDead) {
+		return;
+	}
 	const dx = target.x - character.x;
 	const dy = target.y - character.y;
 	const angle = Math.atan2(dy, dx);
