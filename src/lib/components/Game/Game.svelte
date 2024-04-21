@@ -174,7 +174,9 @@
 			};
 
 			heartObject.inputs.forEach((input) => {
-				heartObject.inputRefs[input.name] = getInputByName(heartObject.machine, input);
+				const inputRef = getInputByName(heartObject.machine, input);
+				if (!inputRef) return;
+				heartObject.inputRefs[input.name] = inputRef;
 			});
 
 			hearts.push(heartObject);
@@ -184,15 +186,19 @@
 	function setupHero() {
 		//set up hero
 		hero.artboard = file.artboardByName('Hero');
-		hero.mainWrapper = hero.artboard?.node('main wrapper');
-		hero.mainWrapper.scaleX = artboardScale;
-		hero.mainWrapper.scaleY = artboardScale;
+		hero.mainWrapper = hero.artboard?.node('main wrapper') || null;
+		if (hero.mainWrapper) {
+			hero.mainWrapper.scaleX = artboardScale;
+			hero.mainWrapper.scaleY = artboardScale;
+		}
 		hero.machine = new rive.StateMachineInstance(
 			hero?.artboard?.stateMachineByName('State Machine 1'),
 			hero.artboard
 		);
 		hero.inputs.forEach((input) => {
-			hero.inputRefs[input.name] = getInputByName(hero?.machine as StateMachineInstance, input);
+			const inputRef = getInputByName(hero?.machine as StateMachineInstance, input);
+			if (!inputRef) return;
+			hero.inputRefs[input.name] = inputRef;
 		});
 
 		//setup hero splatter artboard
@@ -218,15 +224,19 @@
 		//set up enemies
 		enemies.forEach((enemy) => {
 			enemy.artboard = file.artboardByName('Slime');
-			enemy.mainWrapper = enemy.artboard?.node('main wrapper');
-			enemy.mainWrapper.scaleX = artboardScale;
-			enemy.mainWrapper.scaleY = artboardScale;
+			enemy.mainWrapper = enemy.artboard?.node('main wrapper') || null;
+			if (enemy.mainWrapper) {
+				enemy.mainWrapper.scaleX = artboardScale;
+				enemy.mainWrapper.scaleY = artboardScale;
+			}
 			enemy.machine = new rive.StateMachineInstance(
 				enemy.artboard?.stateMachineByName('State Machine 1'),
 				enemy.artboard
 			);
 			enemy.inputs.forEach((input) => {
-				enemy.inputRefs[input.name] = getInputByName(enemy.machine as StateMachineInstance, input);
+				const inputRef = getInputByName(enemy.machine as StateMachineInstance, input);
+				if (!inputRef) return;
+				enemy.inputRefs[input.name] = inputRef;
 			});
 
 			//setup slime splatter artboard
@@ -275,8 +285,10 @@
 			//draw hero
 			hero?.artboard?.advance(elapsedTimeSec);
 			hero?.machine?.advance(elapsedTimeSec);
-			hero.mainWrapper.x = hero.x;
-			hero.mainWrapper.y = hero.y;
+			if (hero.mainWrapper) {
+				hero.mainWrapper.x = hero.x;
+				hero.mainWrapper.y = hero.y;
+			}
 			hero?.artboard?.draw(renderer);
 			rive.requestAnimationFrame(gameLoop);
 			return;
@@ -310,8 +322,10 @@
 			enemy?.artboard?.advance(elapsedTimeSec);
 			enemy?.machine?.advance(elapsedTimeSec);
 			enemy?.artboard?.draw(renderer);
-			enemy.mainWrapper.x = enemy?.x;
-			enemy.mainWrapper.y = enemy?.y;
+			if (enemy.mainWrapper) {
+				enemy.mainWrapper.x = enemy?.x;
+				enemy.mainWrapper.y = enemy?.y;
+			}
 		});
 
 		enemies.forEach((enemy) => {
@@ -355,8 +369,10 @@
 			setHeroPosition(elapsedTimeSec, hero, levelBoundaries, boostFactor);
 			hero.artboard?.advance(elapsedTimeSec);
 			hero.machine?.advance(elapsedTimeSec);
-			hero.mainWrapper.x = hero.x;
-			hero.mainWrapper.y = hero.y;
+			if (hero.mainWrapper) {
+				hero.mainWrapper.x = hero.x;
+				hero.mainWrapper.y = hero.y;
+			}
 			hero.artboard?.draw(renderer);
 		}
 

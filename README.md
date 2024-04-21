@@ -1,22 +1,11 @@
-# create-svelte
+# Rive Slime Survival Game
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).
-
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```bash
-# create a new project in the current directory
-npm create svelte@latest
-
-# create a new project in my-app
-npm create svelte@latest my-app
-```
+This is a game I built over the course of a few days using the canvas-advanced Rive runtime.
+It's partially based on this example: https://codesandbox.io/p/sandbox/rive-canvas-advanced-api-centaur-example-exh2os?file=%2Fsrc%2Findex.ts
 
 ## Developing
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Once you've created a project and installed dependencies with `npm install` and start a development server:
 
 ```bash
 npm run dev
@@ -27,12 +16,10 @@ npm run dev -- --open
 
 ## Building
 
-To create a production version of your app:
+To create a production version:
 
 ```bash
 npm run build
 ```
 
 You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.

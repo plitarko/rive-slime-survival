@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Artboard, StateMachineInstance } from '@rive-app/canvas-advanced';
+import type { Artboard, StateMachineInstance, SMIInput, Node } from '@rive-app/canvas-advanced';
 
 export interface Character {
 	health: number;
@@ -9,11 +8,11 @@ export interface Character {
 	x: number;
 	y: number;
 	artboard: Artboard | null;
-	altArtboards: { artboard: Artboard; mainWrapper: any; machine: StateMachineInstance }[] | [];
+	altArtboards: { artboard: Artboard; mainWrapper: Node; machine: StateMachineInstance }[] | [];
 	machine: StateMachineInstance | null;
-	inputRefs: { [key: string]: any };
+	inputRefs: { [key: string]: SMIInput };
 	inputs: { name: string; type: 'bool' | 'trigger' }[];
-	mainWrapper: any;
+	mainWrapper: Node | null;
 	movement: {
 		up: boolean;
 		down: boolean;
@@ -28,8 +27,8 @@ export interface Character {
 
 export interface ArtboardData {
 	artboard: Artboard;
-	mainWrapper: any;
+	mainWrapper: Node | null;
 	machine: StateMachineInstance;
-	inputRefs: { [key: string]: any };
+	inputRefs: { [key: string]: SMIInput };
 	inputs: { name: string; type: 'bool' | 'trigger' }[];
 }
