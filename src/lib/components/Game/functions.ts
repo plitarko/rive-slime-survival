@@ -26,13 +26,6 @@ export function getCharacterRect(character: Character) {
 	};
 }
 
-/**
- * Calculates and returns the hitbox for the sword based on the hero's orientation.
- *
- * @param {Character} hero - The character object representing the hero.
- * @param {Object} swordHitbox - The dimensions of the sword's hitbox, containing width and height properties.
- * @returns {Object} The calculated hitbox for the sword, with properties x, y, width, and height.
- */
 export function getSwordRect(
 	hero: Character,
 	swordHitbox: { width: number; height: number }
@@ -77,26 +70,18 @@ export function getSwordRect(
 	return rect;
 }
 
-/**
- * Calculates the new position of a character based on its movement and speed within specified level boundaries.
- * @param elapsedTimeSec The elapsed time in seconds since the last calculation.
- * @param hero The character whose movement is being calculated.
- * @param levelBoundaries The boundaries of the level within which the character can move.
- */
 export function setHeroPosition(
 	elapsedTimeSec: number,
 	hero: Character,
 	levelBoundaries: { maxX: number; maxY: number; minX: number; minY: number },
 	boostFactor: number = 1
 ): void {
-	// Determine if the movement is diagonal to adjust the speed accordingly
 	const isDiagonal =
 		(hero.movement.up || hero.movement.down) && (hero.movement.left || hero.movement.right);
 	const movementSpeed = isDiagonal
 		? (hero.speed / Math.sqrt(2)) * elapsedTimeSec * boostFactor
 		: hero.speed * elapsedTimeSec * boostFactor;
 
-	// Adjust the hero's position based on movement direction, ensuring they do not exit the level boundaries
 	if (hero.movement.up && hero.y - movementSpeed >= levelBoundaries.minY) {
 		hero.y -= movementSpeed;
 	} else if (hero.movement.up) {
@@ -169,13 +154,6 @@ export function checkSwordHit(
 	return false;
 }
 
-/**
- * Applies knockback to a character based on the position of an offender.
- *
- * @param victim The character receiving the knockback.
- * @param offender The character causing the knockback.
- * @param knockbackStrength The strength of the knockback effect.
- */
 export function applyKnockback(
 	victim: Character,
 	offender: Character,

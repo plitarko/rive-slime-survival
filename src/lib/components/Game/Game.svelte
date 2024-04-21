@@ -143,6 +143,8 @@
 		const canvasRef = canvasElement;
 
 		renderer = rive.makeRenderer(canvasRef);
+
+		//TODO: Find out how to just get the rive file on page load rather than this fetch
 		const bytes = await (await fetch(new Request('rive-files/hero_demo.riv'))).arrayBuffer();
 		file = await rive.load(new Uint8Array(bytes));
 	}
@@ -243,6 +245,21 @@
 		});
 	}
 
+	function resetGame() {
+		enemies = [];
+		hero.isDead = false;
+		hero.health = hero.maxHealth;
+		hero.orientation = 'down';
+		hero.x = 500;
+		hero.y = 450;
+		hearts.forEach((heart) => {
+			heart.inputRefs['fill heart'].fire();
+		});
+		wave = 1;
+		setupHero();
+		setupEnemies();
+	}
+
 	function gameLoop(time: number) {
 		if (!lastTime) {
 			lastTime = time;
@@ -285,7 +302,7 @@
 		}
 
 		//sort enemies
-		enemies = [...enemies.sort((a, b) => a.y - b.y)];
+		enemies.sort((a, b) => a.y - b.y);
 
 		//draw enemies
 		enemies.forEach((enemy) => {
@@ -437,18 +454,7 @@
 					hero.inputRefs.attack.fire();
 					showingWave = true;
 					if (hero.isDead) {
-						enemies = [];
-						hero.isDead = false;
-						hero.health = hero.maxHealth;
-						hero.orientation = 'down';
-						hero.x = 500;
-						hero.y = 450;
-						hearts.forEach((heart) => {
-							heart.inputRefs['fill heart'].fire();
-						});
-						wave = 1;
-						setupHero();
-						setupEnemies();
+						resetGame();
 					}
 				}
 				return;
