@@ -4,8 +4,9 @@
 	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
 	import { onMount } from 'svelte';
 	import { blur } from 'svelte/transition';
-	import GameBro from './GameBro.svelte';
-	import Controls from './Controls.svelte';
+	import GameBro from '../InlineSVGs/GameBro.svelte';
+	import Controls from '../InlineSVGs/Controls.svelte';
+	import GithubIcon from '../InlineSVGs/GithubIcon.svelte';
 	import type { Character, ArtboardData } from './types';
 	import {
 		getInputByName,
@@ -530,6 +531,9 @@
 		<div class="game-bro-wrapper">
 			<GameBro />
 		</div>
+		<a href="https://github.com/plitarko/rive-slime-survival" class="github-link" target="_blank">
+			<GithubIcon />
+		</a>
 	</div>
 </div>
 
@@ -623,5 +627,18 @@
 		text-align: center;
 		font-size: 24px;
 		color: #576c7b;
+	}
+
+	.github-link {
+		position: absolute;
+		bottom: -11.8%;
+		right: 0;
+		height: 9%;
+		width: 9%;
+		color: rgb(48, 55, 61);
+
+		&:hover {
+			color: white;
+		}
 	}
 </style>
