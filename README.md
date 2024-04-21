@@ -1,5 +1,7 @@
 # Rive Slime Survival Game
 
+Try the game here! (Desktop only): https://slime.frederiklist.com
+
 This is a game I built over the course of a few days using the canvas-advanced Rive runtime.
 It's partially based on this example: https://codesandbox.io/p/sandbox/rive-canvas-advanced-api-centaur-example-exh2os?file=%2Fsrc%2Findex.ts
 
