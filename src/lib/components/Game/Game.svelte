@@ -11,7 +11,7 @@
 		getInputByName,
 		getCharacterRect,
 		getSwordRect,
-		setHeroMovement,
+		setHeroPosition,
 		checkSwordHit,
 		checkEnemyCollision,
 		setLinearMovement,
@@ -41,8 +41,16 @@
 		artboard: null,
 		altArtboards: [],
 		machine: null,
-		inputs: {},
-		inputNames: ['attack', 'hit', 'walking', 'up', 'down', 'left', 'right'],
+		inputRefs: {},
+		inputs: [
+			{ name: 'attack', type: 'trigger' },
+			{ name: 'hit', type: 'trigger' },
+			{ name: 'walking', type: 'bool' },
+			{ name: 'up', type: 'trigger' },
+			{ name: 'down', type: 'trigger' },
+			{ name: 'left', type: 'trigger' },
+			{ name: 'right', type: 'trigger' }
+		],
 		mainWrapper: null,
 		movement: {
 			up: false,
@@ -86,8 +94,21 @@
 				artboard: null,
 				altArtboards: [],
 				machine: null,
-				inputs: {},
-				inputNames: ['attack', 'hit', 'die'],
+				inputRefs: {},
+				inputs: [
+					{
+						name: 'attack',
+						type: 'trigger'
+					},
+					{
+						name: 'hit',
+						type: 'trigger'
+					},
+					{
+						name: 'die',
+						type: 'trigger'
+					}
+				],
 				mainWrapper: null,
 				movement: {
 					up: false,
@@ -143,12 +164,15 @@
 				artboard: heartArtboard,
 				machine: heartMachine,
 				mainWrapper: heartMainWrapper,
-				inputNames: ['fill heart', 'lose heart'],
-				inputs: {}
+				inputs: [
+					{ name: 'fill heart', type: 'trigger' },
+					{ name: 'lose heart', type: 'trigger' }
+				],
+				inputRefs: {}
 			};
 
-			heartObject.inputNames.forEach((triggerName) => {
-				heartObject.inputs[triggerName] = getInputByName(heartObject.machine, triggerName);
+			heartObject.inputs.forEach((input) => {
+				heartObject.inputRefs[input.name] = getInputByName(heartObject.machine, input);
 			});
 
 			hearts.push(heartObject);
@@ -165,8 +189,8 @@
 			hero?.artboard?.stateMachineByName('State Machine 1'),
 			hero.artboard
 		);
-		hero.inputNames.forEach((triggerName) => {
-			hero.inputs[triggerName] = getInputByName(hero?.machine as StateMachineInstance, triggerName);
+		hero.inputs.forEach((input) => {
+			hero.inputRefs[input.name] = getInputByName(hero?.machine as StateMachineInstance, input);
 		});
 
 		//setup hero splatter artboard
@@ -199,11 +223,8 @@
 				enemy.artboard?.stateMachineByName('State Machine 1'),
 				enemy.artboard
 			);
-			enemy.inputNames.forEach((triggerName) => {
-				enemy.inputs[triggerName] = getInputByName(
-					enemy.machine as StateMachineInstance,
-					triggerName
-				);
+			enemy.inputs.forEach((input) => {
+				enemy.inputRefs[input.name] = getInputByName(enemy.machine as StateMachineInstance, input);
 			});
 
 			//setup slime splatter
@@ -247,7 +268,7 @@
 		function playSplatter(character: Character, isHero = false) {
 			const splatter = character.altArtboards[0];
 			if (isHero) {
-				const isBlue = getInputByName(splatter.machine, 'isBlue');
+				const isBlue = getInputByName(splatter.machine, { name: 'isBlue', type: 'bool' });
 				if (isBlue) isBlue.value = 1;
 			}
 			splatter?.artboard.advance(elapsedTimeSec);
@@ -285,7 +306,7 @@
 					enemies = enemies.filter((e) => e !== enemy);
 				}
 				if (enemy.timeSinceDeath > 0) {
-					enemy.inputs.die.fire();
+					enemy.inputRefs.die.fire();
 					playSplatter(enemy);
 				}
 				enemy.timeSinceDeath += elapsedTimeSec;
@@ -294,13 +315,13 @@
 			if (!enemy.isDead && hero.timeSinceLastHit > invincibilityTime) {
 				if (checkEnemyCollision(hero, enemy)) {
 					hero.health -= 1;
-					hearts[hero.health]?.inputs['lose heart']?.fire();
-					enemy.inputs.attack.fire();
+					hearts[hero.health]?.inputRefs['lose heart']?.fire();
+					enemy.inputRefs.attack.fire();
 					if (hero.health <= 0) {
 						hero.isDead = true;
 						return;
 					} else {
-						hero.inputs.hit.fire();
+						hero.inputRefs.hit.fire();
 						hero.timeSinceLastHit = 0;
 					}
 
@@ -315,7 +336,7 @@
 		//draw hero
 		if (!hero.isDead) {
 			const boostFactor = hero.timeSinceLastHit < invincibilityTime ? 1.5 : 1;
-			setHeroMovement(elapsedTimeSec, hero, levelBoundaries, boostFactor);
+			setHeroPosition(elapsedTimeSec, hero, levelBoundaries, boostFactor);
 			hero.artboard?.advance(elapsedTimeSec);
 			hero.machine?.advance(elapsedTimeSec);
 			hero.mainWrapper.x = hero.x;
@@ -358,7 +379,7 @@
 				if (enemy.isDead) return;
 				if (checkSwordHit(hero, enemy, swordHitbox)) {
 					enemy.health -= 1;
-					enemy.inputs.hit.fire();
+					enemy.inputRefs.hit.fire();
 					applyKnockback(enemy, hero, 50, levelBoundaries, false);
 				}
 			});
@@ -413,7 +434,7 @@
 			if (!gameStarted || hero.isDead) {
 				if (event.code === 'Space') {
 					gameStarted = true;
-					hero.inputs.attack.fire();
+					hero.inputRefs.attack.fire();
 					showingWave = true;
 					if (hero.isDead) {
 						enemies = [];
@@ -423,7 +444,7 @@
 						hero.x = 500;
 						hero.y = 450;
 						hearts.forEach((heart) => {
-							heart.inputs['fill heart'].fire();
+							heart.inputRefs['fill heart'].fire();
 						});
 						wave = 1;
 						setupHero();
@@ -434,27 +455,27 @@
 			}
 			if (event.code === 'KeyW') {
 				hero.movement.up = true;
-				hero.inputs.up.fire();
+				hero.inputRefs.up.fire();
 				hero.orientation = 'up';
-				hero.inputs.walking.value = 1;
+				hero.inputRefs.walking.value = 1;
 			} else if (event.code === 'KeyS') {
 				hero.movement.down = true;
-				hero.inputs.down.fire();
+				hero.inputRefs.down.fire();
 				hero.orientation = 'down';
-				hero.inputs.walking.value = 1;
+				hero.inputRefs.walking.value = 1;
 			} else if (event.code === 'KeyA') {
 				hero.movement.left = true;
-				hero.inputs.left.fire();
+				hero.inputRefs.left.fire();
 				hero.orientation = 'left';
-				hero.inputs.walking.value = 1;
+				hero.inputRefs.walking.value = 1;
 			} else if (event.code === 'KeyD') {
 				hero.movement.right = true;
-				hero.inputs.right.fire();
+				hero.inputRefs.right.fire();
 				hero.orientation = 'right';
-				hero.inputs.walking.value = 1;
+				hero.inputRefs.walking.value = 1;
 			} else if (event.code === 'Space') {
 				if (timeSinceSwing > 0) return;
-				hero.inputs.attack.fire();
+				hero.inputRefs.attack.fire();
 				isSwingingSword = true;
 				timeSinceSwing = 0;
 			}
@@ -472,8 +493,8 @@
 				hero.movement.right = false;
 			}
 			if (Object.values(hero.movement).every((value) => !value)) {
-				if (hero.inputs.walking) {
-					hero.inputs.walking.value = 0;
+				if (hero.inputRefs.walking) {
+					hero.inputRefs.walking.value = 0;
 				}
 			}
 		});

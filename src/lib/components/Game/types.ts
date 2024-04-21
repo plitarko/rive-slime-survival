@@ -11,8 +11,8 @@ export interface Character {
 	artboard: Artboard | null;
 	altArtboards: { artboard: Artboard; mainWrapper: any; machine: StateMachineInstance }[] | [];
 	machine: StateMachineInstance | null;
-	inputs: { [key: string]: any };
-	inputNames: string[];
+	inputRefs: { [key: string]: any };
+	inputs: { name: string; type: 'bool' | 'trigger' }[];
 	mainWrapper: any;
 	movement: {
 		up: boolean;
@@ -30,6 +30,6 @@ export interface ArtboardData {
 	artboard: Artboard;
 	mainWrapper: any;
 	machine: StateMachineInstance;
-	inputs: { [key: string]: any };
-	inputNames: string[];
+	inputRefs: { [key: string]: any };
+	inputs: { name: string; type: 'bool' | 'trigger' }[];
 }

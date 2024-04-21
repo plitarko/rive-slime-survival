@@ -1,14 +1,17 @@
 import type { StateMachineInstance } from '@rive-app/canvas-advanced';
 import type { Character } from './types';
 
-export function getInputByName(machine: StateMachineInstance, inputName: string) {
+export function getInputByName(
+	machine: StateMachineInstance,
+	input: { name: string; type: 'trigger' | 'bool' }
+) {
 	for (let i = 0, l = machine.inputCount(); i < l; i++) {
-		const input = machine.input(i);
-		if (input.name === inputName) {
-			if (inputName === 'walking' || inputName === 'isBlue') {
-				return input.asBool();
+		const inputRef = machine.input(i);
+		if (inputRef.name === input.name) {
+			if (input.type === 'bool') {
+				return inputRef.asBool();
 			} else {
-				return input.asTrigger();
+				return inputRef.asTrigger();
 			}
 		}
 	}
@@ -80,7 +83,7 @@ export function getSwordRect(
  * @param hero The character whose movement is being calculated.
  * @param levelBoundaries The boundaries of the level within which the character can move.
  */
-export function setHeroMovement(
+export function setHeroPosition(
 	elapsedTimeSec: number,
 	hero: Character,
 	levelBoundaries: { maxX: number; maxY: number; minX: number; minY: number },
@@ -231,7 +234,7 @@ export function isOutOfBounds(
 }
 
 export function getRandomSpawnCoordinates(squareSize = 1000) {
-	const randomOffset = 2000 * Math.random() + 200;
+	const randomOffset = 1500 * Math.random() + 200;
 	// Define the outer boundary coordinates
 	const minX = -randomOffset;
 	const maxX = squareSize + randomOffset;
