@@ -212,7 +212,7 @@ export function isOutOfBounds(
 }
 
 export function getRandomSpawnCoordinates(squareSize = 1000) {
-	const randomOffset = 1500 * Math.random() + 200;
+	const randomOffset = 1500 * Math.random() + 200; //hardcoded values to determine spread of enemies
 	// Define the outer boundary coordinates
 	const minX = -randomOffset;
 	const maxX = squareSize + randomOffset;

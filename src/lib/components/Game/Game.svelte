@@ -27,7 +27,15 @@
 	let gameStarted: boolean = false;
 	let showingWaveTimer: number = 0;
 
-	const drawHitboxes = false;
+	let lastTime: number;
+	let canvasElement: HTMLCanvasElement;
+	let isSwingingSword = false;
+	let timeSinceSwing = 0;
+
+	let rive: any;
+	let renderer: any;
+	let file: any;
+
 	const hero: Character = {
 		health: 3,
 		maxHealth: 3,
@@ -75,6 +83,7 @@
 		width: 200,
 		height: 100
 	};
+	const drawHitboxes = false;
 	const invincibilityTime = 2;
 	const initialSlimeCount = 5;
 
@@ -123,16 +132,6 @@
 			});
 		}
 	}
-	addEnemies();
-
-	let lastTime: number;
-	let canvasElement: HTMLCanvasElement;
-	let isSwingingSword = false;
-	let timeSinceSwing = 0;
-
-	let rive: any;
-	let renderer: any;
-	let file: any;
 
 	async function loadRive() {
 		rive = await RiveCanvas({
@@ -144,7 +143,7 @@
 
 		renderer = rive.makeRenderer(canvasRef);
 
-		//TODO: Find out how to just get the rive file on page load rather than this fetch
+		//TODO: Find out how to get the rive file on page load rather than this fetch
 		const bytes = await (await fetch(new Request('rive-files/hero_demo.riv'))).arrayBuffer();
 		file = await rive.load(new Uint8Array(bytes));
 	}
@@ -229,7 +228,7 @@
 				enemy.inputRefs[input.name] = getInputByName(enemy.machine as StateMachineInstance, input);
 			});
 
-			//setup slime splatter
+			//setup slime splatter artboard
 			const splatterArtboard = file.artboardByName('Splatter');
 			const splatterMachine = new rive.StateMachineInstance(
 				splatterArtboard.stateMachineByName('State Machine 1'),
@@ -301,7 +300,7 @@
 			playSplatter(hero, true);
 		}
 
-		//sort enemies
+		//sort enemies to draw them in the correct order
 		enemies.sort((a, b) => a.y - b.y);
 
 		//draw enemies
@@ -314,13 +313,12 @@
 			enemy.mainWrapper.y = enemy?.y;
 		});
 
-		//check for collisions with enemies
 		enemies.forEach((enemy) => {
 			//check if enemy is dead
 			if (enemy.health <= 0) {
 				enemy.isDead = true;
 				if (enemy.timeSinceDeath > 2) {
-					enemies = enemies.filter((e) => e !== enemy);
+					enemies = enemies.filter((e) => e !== enemy); //TODO: reuse enemies istead of filtering and pushing
 				}
 				if (enemy.timeSinceDeath > 0) {
 					enemy.inputRefs.die.fire();
@@ -411,13 +409,13 @@
 			}
 		}
 
-		//show wave announcemnt if all enmies are dead
+		//show wave announcemnt if all enemies are dead
 		if (enemies.every((enemy) => enemy.isDead) && !showingWave) {
 			wave += 1;
 			showingWave = true;
 		}
 
-		// check if wave announcement is over
+		// check if wave announcement is over and remove it
 		if (showingWave && showingWaveTimer < 5) {
 			showingWaveTimer += elapsedTimeSec;
 		} else {
@@ -441,11 +439,12 @@
 	}
 
 	onMount(() => {
+		addEnemies();
 		loadRive().then(() => {
 			setupUI();
 			setupHero();
 			setupEnemies();
-			rive.requestAnimationFrame(gameLoop);
+			rive.requestAnimationFrame(gameLoop); //TODO: run game loop from worker
 		});
 		addEventListener('keydown', (event) => {
 			if (!gameStarted || hero.isDead) {
