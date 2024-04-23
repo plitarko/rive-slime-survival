@@ -565,7 +565,7 @@
 	});
 </script>
 
-<svelte:window bind:innerWidth />
+<svelte:window bind:innerWidth on:touchend|preventDefault />
 
 <!-- TODO: Add all this DOM inside Rive canvas -->
 <div class="wrapper">
@@ -710,7 +710,7 @@
 		font-size: 24px;
 		color: #576c7b;
 		gap: 10px;
-		text-shadow: 0px 0px 10px #00000067; 
+		text-shadow: 0px 0px 10px #00000067;
 
 		@media screen and (max-width: 850px) {
 			font-size: 16px;
@@ -763,9 +763,12 @@
 		left: -14.6%;
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
+		user-select: none;
+
 		& .d-pad-button {
 			height: 100%;
 			width: 100%;
+			user-select: none;
 		}
 	}
 
@@ -775,5 +778,6 @@
 		right: -19.5%;
 		height: 22%;
 		width: 22%;
+		user-select: none;
 	}
 </style>
