@@ -1,9 +1,9 @@
 <script lang="ts">
-	import RiveCanvas, { type StateMachineInstance } from '@rive-app/canvas-advanced';
+	import Rive, { type StateMachineInstance } from '@rive-app/canvas-advanced';
 	// @ts-ignore
 	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
 	import { onMount } from 'svelte';
-	import { blur } from 'svelte/transition';
+	import { fade } from 'svelte/transition';
 	import GameBro from '../InlineSVGs/GameBro.svelte';
 	import Controls from '../InlineSVGs/Controls.svelte';
 	import GithubIcon from '../InlineSVGs/GithubIcon.svelte';
@@ -20,6 +20,8 @@
 		isOutOfBounds,
 		getRandomSpawnCoordinates
 	} from './functions';
+
+	let innerWidth: number;
 
 	let enemies: Character[] = [];
 	let hearts: ArtboardData[] = [];
@@ -70,7 +72,7 @@
 		orientation: 'down',
 		timeSinceLastHit: 2,
 		isDead: false,
-		timeSinceDeath: 0
+		timeSinceDeath: 2
 	};
 
 	const artboardScale = 4; //determines how big individual artboards are drawn
@@ -135,7 +137,7 @@
 	}
 
 	async function loadRive() {
-		rive = await RiveCanvas({
+		rive = await Rive({
 			// Loads Wasm bundle
 			locateFile: () => riveWASMResource
 		});
@@ -311,6 +313,7 @@
 
 		if (hero.isDead) {
 			playSplatter(hero, true);
+			hero.timeSinceDeath += elapsedTimeSec;
 		}
 
 		//sort enemies to draw them in the correct order
@@ -348,6 +351,9 @@
 					hearts[hero.health]?.inputRefs['lose heart']?.fire();
 					enemy.inputRefs.attack.fire();
 					if (hero.health <= 0) {
+						if (!hero.isDead) {
+							hero.timeSinceDeath = 0;
+						}
 						hero.isDead = true;
 						return;
 					} else {
@@ -455,6 +461,68 @@
 		rive.requestAnimationFrame(gameLoop);
 	}
 
+	function onUp() {
+		if (!gameStarted || hero.isDead) return;
+		hero.movement.up = true;
+		hero.inputRefs.up.fire();
+		hero.orientation = 'up';
+		hero.inputRefs.walking.value = 1;
+	}
+
+	function onDown() {
+		if (!gameStarted || hero.isDead) return;
+		hero.movement.down = true;
+		hero.inputRefs.down.fire();
+		hero.orientation = 'down';
+		hero.inputRefs.walking.value = 1;
+	}
+
+	function onLeft() {
+		if (!gameStarted || hero.isDead) return;
+		hero.movement.left = true;
+		hero.inputRefs.left.fire();
+		hero.orientation = 'left';
+		hero.inputRefs.walking.value = 1;
+	}
+
+	function onRight() {
+		if (!gameStarted || hero.isDead) return;
+		hero.movement.right = true;
+		hero.inputRefs.right.fire();
+		hero.orientation = 'right';
+		hero.inputRefs.walking.value = 1;
+	}
+
+	function swing() {
+		if (timeSinceSwing > 0) return;
+		hero.inputRefs.attack.fire();
+		isSwingingSword = true;
+		timeSinceSwing = 0;
+	}
+
+	function onSwing() {
+		if (!gameStarted || hero.isDead) {
+			gameStarted = true;
+			hero.inputRefs.attack.fire();
+			showingWave = true;
+			if (hero.isDead && hero.timeSinceDeath >= 2) {
+				resetGame();
+			}
+			return;
+		}
+		swing();
+	}
+
+	function stop() {
+		hero.movement.up = false;
+		hero.movement.down = false;
+		hero.movement.left = false;
+		hero.movement.right = false;
+		if (hero.inputRefs.walking) {
+			hero.inputRefs.walking.value = 0;
+		}
+	}
+
 	onMount(() => {
 		addEnemies();
 		loadRive().then(() => {
@@ -464,42 +532,16 @@
 			rive.requestAnimationFrame(gameLoop); //TODO: run game loop from worker
 		});
 		addEventListener('keydown', (event) => {
-			if (!gameStarted || hero.isDead) {
-				if (event.code === 'Space') {
-					gameStarted = true;
-					hero.inputRefs.attack.fire();
-					showingWave = true;
-					if (hero.isDead) {
-						resetGame();
-					}
-				}
-				return;
-			}
 			if (event.code === 'KeyW') {
-				hero.movement.up = true;
-				hero.inputRefs.up.fire();
-				hero.orientation = 'up';
-				hero.inputRefs.walking.value = 1;
+				onUp();
 			} else if (event.code === 'KeyS') {
-				hero.movement.down = true;
-				hero.inputRefs.down.fire();
-				hero.orientation = 'down';
-				hero.inputRefs.walking.value = 1;
+				onDown();
 			} else if (event.code === 'KeyA') {
-				hero.movement.left = true;
-				hero.inputRefs.left.fire();
-				hero.orientation = 'left';
-				hero.inputRefs.walking.value = 1;
+				onLeft();
 			} else if (event.code === 'KeyD') {
-				hero.movement.right = true;
-				hero.inputRefs.right.fire();
-				hero.orientation = 'right';
-				hero.inputRefs.walking.value = 1;
+				onRight();
 			} else if (event.code === 'Space') {
-				if (timeSinceSwing > 0) return;
-				hero.inputRefs.attack.fire();
-				isSwingingSword = true;
-				timeSinceSwing = 0;
+				onSwing();
 			}
 		});
 
@@ -523,24 +565,29 @@
 	});
 </script>
 
+<svelte:window bind:innerWidth />
+
+<!-- TODO: Add all this DOM inside Rive canvas -->
 <div class="wrapper">
 	<div class="game-window">
 		<canvas height="1000" width="1000" bind:this={canvasElement}></canvas>
 		{#if showingWave}
-			<div transition:blur class="wave-counter">
+			<div transition:fade class="wave-counter">
 				<span>Wave {wave}</span>
 			</div>
 		{/if}
 		{#if !gameStarted || hero.isDead}
 			<div class="start-game-menu">
-				{#if hero.isDead}
-					<span>GAME OVER</span>
-					<span>Press SPACE to play again</span>
-				{:else}
-					<span>Press SPACE to start</span>
-					<div class="controls-wrapper">
-						<Controls />
-					</div>
+				{#if hero.isDead && hero.timeSinceDeath >= 2}
+					<span in:fade>GAME OVER</span>
+					<span in:fade>Press {innerWidth < 850 ? 'A' : 'SPACE'} to play again</span>
+				{:else if !hero.isDead}
+					<span>Press {innerWidth < 850 ? 'A' : 'SPACE'} to start</span>
+					{#if innerWidth > 850}
+						<div class="controls-wrapper">
+							<Controls />
+						</div>
+					{/if}
 				{/if}
 			</div>
 		{/if}
@@ -550,6 +597,50 @@
 		<a href="https://github.com/plitarko/rive-slime-survival" class="github-link" target="_blank">
 			<GithubIcon />
 		</a>
+		<div class="d-pad">
+			<div class="d-pad-button"></div>
+			<div
+				class="d-pad-button"
+				on:pointerdown={() => {
+					stop();
+					onUp();
+				}}
+				on:pointerup={stop}
+				on:pointerleave={stop}
+			></div>
+			<div class="d-pad-button"></div>
+			<div
+				class="d-pad-button"
+				on:pointerdown={() => {
+					stop();
+					onLeft();
+				}}
+				on:pointerup={stop}
+				on:pointerleave={stop}
+			></div>
+			<div class="d-pad-button"></div>
+			<div
+				class="d-pad-button"
+				on:pointerdown={() => {
+					stop();
+					onRight();
+				}}
+				on:pointerup={stop}
+				on:pointerleave={stop}
+			></div>
+			<div class="d-pad-button"></div>
+			<div
+				class="d-pad-button"
+				on:pointerdown={() => {
+					stop();
+					onDown();
+				}}
+				on:pointerup={stop}
+				on:pointerleave={stop}
+			></div>
+			<div class="d-pad-button"></div>
+		</div>
+		<div class="a-button" on:pointerdown={onSwing}></div>
 	</div>
 </div>
 
@@ -619,6 +710,7 @@
 		font-size: 24px;
 		color: #576c7b;
 		gap: 10px;
+		text-shadow: 0px 0px 10px #00000067; 
 
 		@media screen and (max-width: 850px) {
 			font-size: 16px;
@@ -643,6 +735,11 @@
 		text-align: center;
 		font-size: 24px;
 		color: #576c7b;
+		text-shadow: 0px 0px 10px #00000067;
+
+		@media screen and (max-width: 850px) {
+			font-size: 16px;
+		}
 	}
 
 	.github-link {
@@ -656,5 +753,27 @@
 		&:hover {
 			color: white;
 		}
+	}
+
+	.d-pad {
+		position: absolute;
+		height: 40%;
+		width: 40%;
+		top: 135.6%;
+		left: -14.6%;
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		& .d-pad-button {
+			height: 100%;
+			width: 100%;
+		}
+	}
+
+	.a-button {
+		position: absolute;
+		top: 140.8%;
+		right: -19.5%;
+		height: 22%;
+		width: 22%;
 	}
 </style>
