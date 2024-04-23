@@ -510,7 +510,7 @@
 			}
 			return;
 		}
-		swing();
+		if (!hero.isDead) swing();
 	}
 
 	function stop() {
