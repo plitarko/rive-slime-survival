@@ -23,6 +23,7 @@
 
 	let innerWidth: number;
 
+	let isPaused = false;
 	let enemies: Character[] = [];
 	let hearts: ArtboardData[] = [];
 	let wave: number = 1;
@@ -273,6 +274,9 @@
 	}
 
 	function gameLoop(time: number) {
+		if (isPaused) {
+			return;
+		}
 		if (!lastTime) {
 			lastTime = time;
 		}
@@ -542,6 +546,13 @@
 				onRight();
 			} else if (event.code === 'Space') {
 				onSwing();
+			} else if (event.code === 'Escape') {
+				if (!gameStarted || hero.isDead) return;
+				isPaused = !isPaused;
+				if (!isPaused) {
+					lastTime = performance.now();
+					rive.requestAnimationFrame(gameLoop);
+				}
 			}
 		});
 
@@ -571,9 +582,9 @@
 <div class="wrapper">
 	<div class="game-window">
 		<canvas height="1000" width="1000" bind:this={canvasElement}></canvas>
-		{#if showingWave}
-			<div transition:fade class="wave-counter">
-				<span>Wave {wave}</span>
+		{#if isPaused || showingWave}
+			<div transition:fade={{ duration: isPaused ? 0 : 500 }} class="top-announcement">
+				<span>{isPaused ? 'Paused' : `Wave ${wave}`}</span>
 			</div>
 		{/if}
 		{#if !gameStarted || hero.isDead}
@@ -722,7 +733,7 @@
 		width: 40%;
 	}
 
-	.wave-counter {
+	.top-announcement {
 		position: relative;
 		margin-top: -140%;
 		padding: 6px;
