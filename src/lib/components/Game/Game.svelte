@@ -1,5 +1,10 @@
 <script lang="ts">
-	import Rive, { type StateMachineInstance } from '@rive-app/canvas-advanced';
+	import Rive, {
+		type StateMachineInstance,
+		type RiveCanvas,
+		type WrappedRenderer,
+		type File
+	} from '@rive-app/canvas-advanced';
 	// @ts-ignore
 	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
 	import { onMount } from 'svelte';
@@ -36,9 +41,9 @@
 	let isSwingingSword = false;
 	let timeSinceSwing = 0;
 
-	let rive: any;
-	let renderer: any;
-	let file: any;
+	let rive: RiveCanvas;
+	let renderer: WrappedRenderer;
+	let file: File;
 
 	const hero: Character = {
 		health: 3,
@@ -194,10 +199,12 @@
 			hero.mainWrapper.scaleX = artboardScale;
 			hero.mainWrapper.scaleY = artboardScale;
 		}
-		hero.machine = new rive.StateMachineInstance(
-			hero?.artboard?.stateMachineByName('State Machine 1'),
-			hero.artboard
-		);
+		if (hero?.artboard) {
+			hero.machine = new rive.StateMachineInstance(
+				hero?.artboard?.stateMachineByName('State Machine 1'),
+				hero.artboard
+			);
+		}
 		hero.inputs.forEach((input) => {
 			const inputRef = getInputByName(hero?.machine as StateMachineInstance, input);
 			if (!inputRef) return;
@@ -232,10 +239,12 @@
 				enemy.mainWrapper.scaleX = artboardScale;
 				enemy.mainWrapper.scaleY = artboardScale;
 			}
-			enemy.machine = new rive.StateMachineInstance(
-				enemy.artboard?.stateMachineByName('State Machine 1'),
-				enemy.artboard
-			);
+			if (hero.artboard && enemy.artboard) {
+				enemy.machine = new rive.StateMachineInstance(
+					enemy.artboard?.stateMachineByName('State Machine 1'),
+					enemy.artboard
+				);
+			}
 			enemy.inputs.forEach((input) => {
 				const inputRef = getInputByName(enemy.machine as StateMachineInstance, input);
 				if (!inputRef) return;
