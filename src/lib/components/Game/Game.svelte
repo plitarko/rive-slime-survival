@@ -334,12 +334,12 @@
 			//check if enemy is dead
 			if (enemy.health <= 0) {
 				enemy.isDead = true;
-				if (enemy.timeSinceDeath > 2) {
-					enemies = enemies.filter((e) => e !== enemy); //TODO: reuse enemies istead of filtering and pushing
-				}
 				if (enemy.timeSinceDeath > 0) {
 					enemy.inputRefs.die.fire();
 					playSplatter(enemy);
+				}
+				if (enemy.timeSinceDeath > 2) {
+					enemies = enemies.filter((e) => e !== enemy); //TODO: reuse enemies istead of filtering and pushing
 				}
 				enemy.timeSinceDeath += elapsedTimeSec;
 			}
