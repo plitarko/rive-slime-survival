@@ -4,9 +4,7 @@
 		type RiveCanvas,
 		type WrappedRenderer,
 		type File
-	} from '@rive-app/canvas-advanced';
-	// @ts-ignore
-	import riveWASMResource from '@rive-app/canvas-advanced/rive.wasm';
+	} from '@rive-app/webgl2-advanced';
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import GameBro from '../InlineSVGs/GameBro.svelte';
@@ -15,8 +13,6 @@
 	import type { Character, ArtboardData } from './types';
 	import {
 		getInputByName,
-		getCharacterRect,
-		getSwordRect,
 		setHeroPosition,
 		checkSwordHit,
 		checkEnemyCollision,
@@ -92,7 +88,6 @@
 		width: 200,
 		height: 100
 	};
-	const drawHitboxes = false;
 	const invincibilityTime = 2;
 	const initialSlimeCount = 5;
 
@@ -145,7 +140,7 @@
 	async function loadRive() {
 		rive = await Rive({
 			// Loads Wasm bundle
-			locateFile: () => riveWASMResource
+			locateFile: () => 'https://unpkg.com/@rive-app/webgl2-advanced@2.15.0/rive.wasm'
 		});
 
 		const canvasRef = canvasElement;
@@ -296,19 +291,6 @@
 
 		renderer.clear();
 
-		if (!gameStarted) {
-			//draw hero
-			hero?.artboard?.advance(elapsedTimeSec);
-			hero?.machine?.advance(elapsedTimeSec);
-			if (hero.mainWrapper) {
-				hero.mainWrapper.x = hero.x;
-				hero.mainWrapper.y = hero.y;
-			}
-			hero?.artboard?.draw(renderer);
-			rive.requestAnimationFrame(gameLoop);
-			return;
-		}
-
 		function playSplatter(character: Character, isHero = false) {
 			const splatter = character.altArtboards[0];
 			if (isHero) {
@@ -329,20 +311,24 @@
 			hero.timeSinceDeath += elapsedTimeSec;
 		}
 
-		//sort enemies to draw them in the correct order
+		// //sort enemies to draw them in the correct order
 		enemies.sort((a, b) => a.y - b.y);
 
-		//draw enemies
-		enemies.forEach((enemy) => {
-			setLinearMovement(elapsedTimeSec, enemy, hero);
-			enemy?.artboard?.advance(elapsedTimeSec);
-			enemy?.machine?.advance(elapsedTimeSec);
-			enemy?.artboard?.draw(renderer);
-			if (enemy.mainWrapper) {
-				enemy.mainWrapper.x = enemy?.x;
-				enemy.mainWrapper.y = enemy?.y;
-			}
-		});
+		// //draw enemies
+		if (gameStarted) {
+			enemies.forEach((enemy) => {
+				setLinearMovement(elapsedTimeSec, enemy, hero);
+				enemy?.artboard?.advance(elapsedTimeSec);
+				enemy?.machine?.advance(elapsedTimeSec);
+				renderer.save();
+				if (enemy.mainWrapper) {
+					enemy.mainWrapper.x = enemy?.x;
+					enemy.mainWrapper.y = enemy?.y;
+				}
+				enemy?.artboard?.draw(renderer);
+				renderer.restore();
+			});
+		}
 
 		enemies.forEach((enemy) => {
 			//check if enemy is dead
@@ -383,43 +369,30 @@
 		});
 
 		//draw hero
-		if (!hero.isDead) {
+		if (!hero.isDead || !gameStarted) {
 			const boostFactor = hero.timeSinceLastHit < invincibilityTime ? 1.5 : 1;
 			setHeroPosition(elapsedTimeSec, hero, levelBoundaries, boostFactor);
 			hero.artboard?.advance(elapsedTimeSec);
 			hero.machine?.advance(elapsedTimeSec);
+			renderer.save();
 			if (hero.mainWrapper) {
 				hero.mainWrapper.x = hero.x;
 				hero.mainWrapper.y = hero.y;
 			}
 			hero.artboard?.draw(renderer);
+			renderer.restore();
 		}
 
 		//draw hearts
 		hearts.forEach((heart, index) => {
 			heart.artboard.advance(elapsedTimeSec);
 			heart.machine.advance(elapsedTimeSec);
+			renderer.save();
 			heart.artboard.draw(renderer);
+			renderer.restore();
 		});
 
-		//draw hitboxes
-		if (drawHitboxes) {
-			//@ts-ignore
-			renderer.fillStyle = 'rgba(255, 0, 0, 0.5)';
-
-			const heroRect = getCharacterRect(hero);
-			//@ts-ignore
-			renderer.fillRect(heroRect.x, heroRect.y, heroRect.width, heroRect.height);
-
-			enemies.forEach((enemy) => {
-				const enemyRect = getCharacterRect(enemy);
-				//@ts-ignore
-				renderer.fillRect(enemyRect.x, enemyRect.y, enemyRect.width, enemyRect.height);
-			});
-		}
-		renderer.save();
-
-		//check for sword hit
+		// //check for sword hit
 		if (isSwingingSword) {
 			timeSinceSwing += elapsedTimeSec;
 			if (timeSinceSwing > 0.2) {
@@ -434,24 +407,15 @@
 					applyKnockback(enemy, hero, 50, levelBoundaries, false);
 				}
 			});
-
-			if (drawHitboxes) {
-				//@ts-ignore
-				renderer.fillStyle = 'rgba(255, 0, 0, 0.5)';
-				//draw sword hitbox
-				const swordRect = getSwordRect(hero, swordHitbox);
-				//@ts-ignore
-				renderer.fillRect(swordRect.x, swordRect.y, swordRect.width, swordRect.height);
-			}
 		}
 
-		//show wave announcemnt if all enemies are dead
+		//show wave announcement if all enemies are dead
 		if (enemies.every((enemy) => enemy.isDead) && !showingWave) {
 			wave += 1;
 			showingWave = true;
 		}
 
-		// check if wave announcement is over and remove it
+		// // check if wave announcement is over and remove it
 		if (showingWave && showingWaveTimer < 5) {
 			showingWaveTimer += elapsedTimeSec;
 		} else {
@@ -459,18 +423,16 @@
 			showingWaveTimer = 0;
 		}
 
-		//generate next level if all enemies are dead
+		// //generate next level if all enemies are dead
 		if (
 			enemies.every((enemy) => enemy.isDead) &&
 			enemies.every((enemy) => enemy.timeSinceDeath > 2)
 		) {
 			addEnemies();
 			setupEnemies();
-			rive.requestAnimationFrame(gameLoop);
-			return;
 		}
-		renderer.restore();
 
+		renderer.flush();
 		rive.requestAnimationFrame(gameLoop);
 	}
 
@@ -591,7 +553,7 @@
 <div class="wrapper">
 	<div class="game-window">
 		<canvas height="1000" width="1000" bind:this={canvasElement}></canvas>
-		{#if isPaused || showingWave}
+		{#if isPaused || (showingWave && !hero.isDead)}
 			<div transition:fade={{ duration: isPaused ? 0 : 500 }} class="top-announcement">
 				<span>{isPaused ? 'Paused' : `Wave ${wave}`}</span>
 			</div>

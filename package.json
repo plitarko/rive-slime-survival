@@ -33,6 +33,7 @@
 	"type": "module",
 	"dependencies": {
 		"@rive-app/canvas-advanced": "^2.14.1",
+		"@rive-app/webgl-advanced": "^2.15.0",
 		"@rive-app/webgl2-advanced": "^2.14.3"
 	}
 }
